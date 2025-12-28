@@ -1,5 +1,7 @@
 # Stocks-Lab - 投资项目只读披露平台
 
+**中文** | [English](#stocks-lab---investment-portfolio-disclosure-platform)
+
 这是一个基于 Django + Django REST Framework 的投资项目披露平台，支持项目管理、出资记录、日结余记录、交易记录等功能。采用 Mobile-first 响应式设计，支持电脑和手机浏览。
 
 ## 功能特性
