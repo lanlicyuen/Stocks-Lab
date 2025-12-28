@@ -354,3 +354,390 @@ A: 检查 `media/` 目录权限，确保 Django 进程有写入权限。
 ---
 
 **注意**：这是一个披露平台，不是交易系统，不接入券商 API。所有数据均为手动录入。
+
+---
+
+# Stocks-Lab - Investment Portfolio Disclosure Platform
+
+[中文](#stocks-lab---投资项目只读披露平台) | **English**
+
+An investment portfolio disclosure platform based on Django + Django REST Framework, supporting project management, contribution records, daily balance tracking, and trade logging. Features mobile-first responsive design for both desktop and mobile viewing. **Now with full internationalization support (Chinese/English).**
+
+## Features
+
+### Core Features
+- **Market Accounts Management**: Create and manage multiple market accounts (US stocks, HK stocks, crypto)
+- **Role-Based Permissions**: Project-level access control (ADMIN/VIEWER)
+- **Trade Records**: Detailed logging of every trade with analysis and notes
+- **Position Tracking**: Real-time position monitoring with P&L calculation
+- **Order Management**: Pending orders with status tracking (PENDING/FILLED/CANCELLED)
+- **Cash Adjustments**: Track deposits, withdrawals, fees, and interest
+- **Attachment Support**: Add images to trades and daily balances
+- **Audit Logs**: Automatic logging of all key operations
+- **🌐 Internationalization**: Full Chinese/English UI with language switcher
+
+### Permission Control
+- Resource-level permissions based on ProjectMember
+- Users without project access receive 403 errors
+- VIEWER role: read-only access (GET/HEAD/OPTIONS)
+- ADMIN role: full access (POST/PUT/PATCH/DELETE)
+- Attachment access requires project verification
+
+### Frontend Features
+- Mobile-first responsive design
+- Bottom tab navigation for mobile
+- Large touch-friendly buttons
+- Numeric keyboard support
+- Card-based list display
+- Markdown support (trade analysis)
+- **Language switcher** in navigation bar
+- **Real-time translation** for all UI elements
+
+## Quick Start
+
+### 1. Requirements
+- Python 3.8+
+- Node.js 16+ and npm
+- pip
+
+### 2. Initialize Project
+
+```bash
+# Navigate to project directory
+cd ~/Html-Project/Stocks-Lab
+
+# Initialize backend
+./manage.sh setup
+./manage.sh migrate
+./manage.sh admin
+
+# Install frontend dependencies
+cd frontend && npm install && cd ..
+
+# (Optional) Generate test data
+source venv/bin/activate
+python create_test_data.py
+```
+
+### 3. Start Development Environment
+
+**Option 1: Unified Start (Recommended)**
+```bash
+./start_dev.sh
+```
+
+This uses tmux to start both frontend and backend services.
+
+**Option 2: Separate Start**
+```bash
+# Terminal 1 - Start backend (port 20004)
+./manage.sh run
+
+# Terminal 2 - Start frontend (port 20003)
+cd frontend && npm run dev
+```
+
+### 4. Access System
+
+- **Frontend**: http://localhost:20003
+- **Admin Panel**: http://localhost:20004/admin
+- **API Endpoints**: http://localhost:20004/api/v1
+
+Test accounts (after running `create_test_data.py`):
+- Admin: `admin` / `admin123`
+- Viewer: `viewer` / `viewer123`
+
+### 5. Stop Services
+
+```bash
+./stop_dev.sh
+```
+
+**Detailed Port Configuration**: See [PORT_CONFIGURATION.md](PORT_CONFIGURATION.md)
+
+## Internationalization (i18n)
+
+### Switching Languages
+
+1. Click the language switcher in the navigation bar (CN/EN buttons)
+2. Language preference is saved in browser localStorage
+3. All pages update automatically on language change
+
+### Supported Pages
+- ✅ Login page
+- ✅ Account list
+- ✅ Account details (including modals)
+- ✅ Add security form
+- ✅ Add trade form
+- ✅ Cash adjustment modal
+- ✅ Delete confirmation dialogs
+
+### Translation System
+- **File**: `/static/js/i18n.js`
+- **200+ translation keys** covering all UI elements
+- **Client-side translation** for instant language switching
+- **Persistent language selection** across sessions
+
+## Usage Workflow
+
+### Create Projects and Add Members
+
+1. Login to admin panel: http://localhost:8002/admin
+2. Create new project in "Investment Projects"
+3. Add members in "Project Members":
+   - Select project
+   - Select user
+   - Set role (ADMIN or VIEWER)
+
+### Add Contribution Records
+
+1. Navigate to admin "Contribution Records"
+2. Click "Add contribution record"
+3. Fill in contribution details:
+   - Select project
+   - Select contributor
+   - Enter amount
+   - Set contribution date
+
+### Using Frontend Interface
+
+1. Login to frontend: http://localhost:8002
+2. Select project from dashboard
+3. Admins can:
+   - Add daily balance records
+   - Add trade records
+   - View all data
+4. Viewers can:
+   - View daily balances
+   - View trade records
+   - View contribution records
+
+## API Endpoints
+
+**Base URL**: `http://localhost:20004/api/v1`
+
+### Authentication
+- `POST /login/` - Login (Django session)
+- `POST /logout/` - Logout
+- `GET /api/v1/me/` - Get current user info
+
+### Market Accounts
+- `GET /api/v1/accounts/` - List market accounts
+- `POST /api/v1/accounts/` - Create account (auto-assigned as admin)
+- `GET /api/v1/accounts/{id}/` - Get account details
+- `GET /api/v1/accounts/{id}/trades/` - Get account trades
+- `GET /api/v1/accounts/{id}/positions/` - Get account positions
+
+### Securities
+- `GET /api/v1/securities/` - List securities
+- `POST /api/v1/securities/` - Create security (admin only)
+- `GET /api/v1/securities/{id}/` - Get security details
+
+### Trades
+- `GET /api/v1/trades/` - List trades
+  - Query params: `account`, `security`, `action`, `status`, `from_date`, `to_date`
+- `POST /api/v1/trades/` - Create trade (admin only)
+- `GET /api/v1/trades/{id}/` - Get trade details
+- `PATCH /api/v1/trades/{id}/` - Update trade (admin only)
+- `POST /api/v1/trades/{id}/confirm_fill/` - Confirm pending order
+- `POST /api/v1/trades/{id}/cancel/` - Cancel pending order
+
+### Positions
+- `GET /api/v1/positions/` - List positions
+- `GET /api/v1/positions/{id}/` - Get position details
+- `POST /api/v1/positions/{id}/close/` - Close position
+
+### Audit Logs
+- `GET /api/v1/audit-logs/` - Get audit logs (own operations only)
+  - Query params: `action`, `model_type`, `model_id`
+
+## Management Commands
+
+```bash
+# Start frontend and backend together
+./start_dev.sh
+
+# Stop all services
+./stop_dev.sh
+
+# Check port status
+./check_ports.sh
+
+# View system status
+./manage.sh status
+
+# Run database migrations
+./manage.sh migrate
+
+# Create admin user
+./manage.sh admin
+
+# Start backend server (port 20004)
+./manage.sh run
+
+# Start frontend server (port 20003)
+cd frontend && npm run dev
+
+# Enter Django Shell
+./manage.sh shell
+
+# Collect static files
+./manage.sh static
+
+# Clean cache files
+./manage.sh clean
+
+# Backup database
+./manage.sh backup
+```
+
+## Project Structure
+
+```
+Stocks-Lab/
+├── manage.py                 # Django management script
+├── manage.sh                 # Project management script
+├── requirements.txt          # Python dependencies
+├── .env.example             # Environment variables example
+├── .gitignore               # Git ignore file
+├── db.sqlite3               # SQLite database
+├── stocks_lab/              # Django project config
+│   ├── settings.py          # Project settings
+│   ├── urls.py              # Main URL configuration
+│   └── ...
+├── core/                     # Core application
+│   ├── models.py            # Data models
+│   ├── serializers.py       # DRF serializers
+│   ├── viewsets.py          # DRF viewsets
+│   ├── views.py             # Frontend views
+│   ├── permissions.py       # Permission classes
+│   └── ...
+├── templates/                # Frontend templates
+│   ├── base_new.html        # Base template
+│   ├── login_new.html       # Login page
+│   ├── accounts_list.html   # Account list
+│   ├── account_detail.html  # Account details
+│   ├── security_form.html   # Add security form
+│   ├── trade_form.html      # Add trade form
+│   └── ...
+├── static/                   # Static files
+│   └── js/
+│       └── i18n.js          # Internationalization translations
+└── media/                    # Media files (attachment storage)
+```
+
+## Technology Stack
+
+### Backend
+- Django 4.2.9
+- Django REST Framework 3.14.0
+- django-cors-headers 4.3.1
+- django-filter 23.5
+- Pillow 10.1.0 (image processing)
+- Markdown 3.5.1 (markdown rendering)
+
+### Frontend
+- Django Templates
+- Vanilla JavaScript (Fetch API)
+- Responsive CSS (Mobile-first)
+- **Client-side i18n** with localStorage persistence
+
+### Database
+- SQLite3 (development)
+- Easy migration to PostgreSQL/MySQL
+
+## Development Guide
+
+### Adding New Features
+
+1. Modify `core/models.py` to add new models
+2. Run `./manage.sh migrate` to create database tables
+3. Add serializers in `core/serializers.py`
+4. Add viewsets in `core/viewsets.py`
+5. Register routes in `core/urls.py`
+6. Register admin interface in `core/admin.py`
+
+### Adding Translations
+
+Edit `/static/js/i18n.js`:
+
+```javascript
+const translations = {
+    'zh-hans': {
+        'your_key': '中文文本',
+        // ...
+    },
+    'en': {
+        'your_key': 'English text',
+        // ...
+    }
+};
+```
+
+In HTML template:
+```html
+<span id="your-element">中文文本</span>
+
+<script>
+document.getElementById('your-element').textContent = t('your_key');
+</script>
+```
+
+### Custom Permissions
+
+Inherit `BasePermission` class in `core/permissions.py`:
+
+```python
+from rest_framework.permissions import BasePermission
+
+class CustomPermission(BasePermission):
+    def has_permission(self, request, view):
+        # Your logic here
+        return True
+```
+
+## Production Deployment
+
+1. **Change SECRET_KEY**: Generate new key and set in `.env`
+2. **Disable DEBUG**: Set `DEBUG=False`
+3. **Configure ALLOWED_HOSTS**: Add your domain
+4. **Use PostgreSQL**: Replace SQLite database
+5. **Configure S3**: Migrate attachments to S3
+6. **Use Nginx + Gunicorn**: Production web server
+7. **Enable HTTPS**: Configure SSL certificate
+8. **Collect static files**: Run `./manage.sh static`
+
+## FAQ
+
+### Q: How to reset password?
+A: Use admin panel or Django Shell:
+```python
+from django.contrib.auth.models import User
+user = User.objects.get(username='username')
+user.set_password('new_password')
+user.save()
+```
+
+### Q: How to backup data?
+A: Run `./manage.sh backup` to automatically backup SQLite database.
+
+### Q: How to switch to PostgreSQL?
+A: Modify `DATABASES` config in `stocks_lab/settings.py`.
+
+### Q: Attachment upload failed?
+A: Check `media/` directory permissions, ensure Django process has write access.
+
+### Q: How to add more languages?
+A: Edit `static/js/i18n.js` and add new language entries to the `translations` object.
+
+## License
+
+This project is for educational and personal use only.
+
+## Contact
+
+For questions or suggestions, please contact the project maintainer.
+
+---
+
+**Note**: This is a disclosure platform, not a trading system. It does not connect to broker APIs. All data is manually entered.
