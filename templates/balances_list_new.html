@@ -1,0 +1,202 @@
+{% extends 'base_new.html' %}
+
+{% block title %}日结余列表 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="javascript:history.back()">返回项目</a>
+    <a href="{% url 'balances' %}" class="active">日结余</a>
+    <a href="{% url 'trades' %}">交易记录</a>
+</div>
+
+<!-- Filter Section -->
+<div class="card">
+    <div class="card-body">
+        <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+                <label>开始日期</label>
+                <input type="date" id="fromDate" class="form-control">
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>结束日期</label>
+                <input type="date" id="toDate" class="form-control">
+            </div>
+            <div class="form-group" style="flex: 0 0 auto; align-self: flex-end;">
+                <button class="btn btn-primary" onclick="loadBalances()">筛选</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Balances List -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">日结余记录</h2>
+        {% if user_role == 'ADMIN' %}
+        <button class="btn btn-primary btn-sm" onclick="showCreateModal()">+ 新建</button>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div id="balancesList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAB for mobile -->
+{% if user_role == 'ADMIN' %}
+<button class="fab" onclick="showCreateModal()" title="新建日结余">
+    +
+</button>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const userRole = '{{ user_role }}';
+
+async function loadBalances() {
+    // Try to get projectId from URL parameter first, then localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!projectId) {
+        showError('请先选择项目');
+        document.getElementById('balancesList').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <div>请先选择项目</div>
+                <a href="/" class="btn btn-primary">返回首页</a>
+            </div>
+        `;
+        return;
+    }
+    
+    const fromDate = document.getElementById('fromDate').value;
+    const toDate = document.getElementById('toDate').value;
+    
+    let url = `/balances/?project=${projectId}`;
+    if (fromDate) url += `&date_after=${fromDate}`;
+    if (toDate) url += `&date_before=${toDate}`;
+    
+    try {
+        const balances = await API.get(url);
+        renderBalances(balances);
+    } catch (error) {
+        console.error('Failed to load balances:', error);
+        showError('加载失败，请刷新重试');
+    }
+}
+
+function renderBalances(balances) {
+    const container = document.getElementById('balancesList');
+    
+    if (balances.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <div>暂无数据</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Mobile cards
+    container.innerHTML = balances.map(b => `
+        <div class="mobile-card" onclick="viewBalance(${b.id})">
+            <div class="mobile-card-primary">${formatDate(b.date)}</div>
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">账户余额</span>
+                <span class="mobile-card-value" style="font-weight: bold; color: var(--primary-color);">
+                    ${formatCurrency(b.amount)}
+                </span>
+            </div>
+            ${b.note ? `
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">备注</span>
+                <span class="mobile-card-value">${b.note}</span>
+            </div>
+            ` : ''}
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">记录人</span>
+                <span class="mobile-card-value">${b.recorded_by.username}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    // Desktop table
+    container.innerHTML += `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>日期</th>
+                        <th>账户余额</th>
+                        <th>备注</th>
+                        <th>记录人</th>
+                        <th>记录时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${balances.map(b => `
+                        <tr>
+                            <td><strong>${formatDate(b.date)}</strong></td>
+                            <td style="font-weight: bold; color: var(--primary-color);">
+                                ${formatCurrency(b.amount)}
+                            </td>
+                            <td>${b.note || '-'}</td>
+                            <td>${b.recorded_by.username}</td>
+                            <td>${formatDateTime(b.created_at)}</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" onclick="viewBalance(${b.id})">查看</button>
+                                ${userRole === 'ADMIN' ? `
+                                <button class="btn btn-danger btn-sm" onclick="deleteBalance(${b.id})">删除</button>
+                                ` : ''}
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function showCreateModal() {
+    window.location.href = '/balances/create/';
+}
+
+function viewBalance(id) {
+    showInfo(`查看详情功能开发中... (ID: ${id})`);
+}
+
+async function deleteBalance(id) {
+    if (!confirm('确定要删除这条记录吗？')) return;
+    
+    try {
+        await API.delete(`/balances/${id}/`);
+        showSuccess('删除成功！');
+        loadBalances();
+    } catch (error) {
+        showError('删除失败：' + error.message);
+    }
+}
+
+// Set default date range (last 30 days)
+document.addEventListener('DOMContentLoaded', () => {
+    const today = new Date();
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+    
+    document.getElementById('toDate').value = today.toISOString().split('T')[0];
+    document.getElementById('fromDate').value = thirtyDaysAgo.toISOString().split('T')[0];
+    
+    loadBalances();
+});
+</script>
+{% endblock %}

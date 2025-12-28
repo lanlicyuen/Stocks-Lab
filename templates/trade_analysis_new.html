@@ -1,0 +1,381 @@
+{% extends 'base_new.html' %}
+
+{% block title %}分类复盘 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="javascript:history.back()">返回项目</a>
+    <a href="#">分类复盘</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">交易分类复盘与统计</h2>
+        <span id="projectBadge" class="badge badge-primary" style="display: none;"></span>
+    </div>
+    <div class="card-body">
+        <!-- 筛选条件 -->
+        <div class="filter-section" style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+            <div class="form-row" style="margin-bottom: 10px;">
+                <div class="form-group" style="flex: 1; margin-right: 10px;">
+                    <label>开始日期</label>
+                    <input type="date" id="fromDate" class="form-control">
+                </div>
+                <div class="form-group" style="flex: 1; margin-right: 10px;">
+                    <label>结束日期</label>
+                    <input type="date" id="toDate" class="form-control">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="form-group" style="flex: 1; margin-right: 10px;">
+                    <label>资产类别</label>
+                    <select id="assetClassFilter" class="form-control">
+                        <option value="">全部类别</option>
+                        <option value="US_STOCK">美股</option>
+                        <option value="HK_STOCK">港股</option>
+                        <option value="CRYPTO">加密货币</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1; margin-right: 10px;">
+                    <label>行业筛选</label>
+                    <select id="sectorFilter" class="form-control">
+                        <option value="">全部行业</option>
+                    </select>
+                </div>
+                <div class="form-group" style="flex: 1;">
+                    <label>&nbsp;</label>
+                    <button onclick="applyFilter()" class="btn btn-primary" style="width: 100%;">查询</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 统计概览 -->
+        <div id="overviewStats" style="display: none; margin-bottom: 20px;">
+            <h3 style="margin-bottom: 15px;">📊 统计概览</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                <div style="background: #e7f3ff; padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">总交易次数</div>
+                    <div style="font-size: 24px; font-weight: bold; color: var(--primary-color);" id="totalTrades">0</div>
+                </div>
+                <div style="background: #e8f5e9; padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">买入总额</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #28a745;" id="totalBuy">¥0</div>
+                </div>
+                <div style="background: #ffebee; padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">卖出总额</div>
+                    <div style="font-size: 24px; font-weight: bold; color: #dc3545;" id="totalSell">¥0</div>
+                </div>
+                <div style="background: #fff3e0; padding: 15px; border-radius: 8px;">
+                    <div style="font-size: 14px; color: #666; margin-bottom: 5px;">净流量</div>
+                    <div style="font-size: 24px; font-weight: bold;" id="netFlow">¥0</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 按行业汇总 -->
+        <div id="sectorSummary" style="display: none; margin-bottom: 30px;">
+            <h3 style="margin-bottom: 15px;">📈 行业汇总</h3>
+            <div id="sectorTable" class="table-container">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+        
+        <!-- 按股票详细 -->
+        <div id="securityDetail" style="display: none;">
+            <h3 style="margin-bottom: 15px;">📑 股票明细</h3>
+            <div id="securityTable" class="table-container">
+                <!-- 动态填充 -->
+            </div>
+        </div>
+        
+        <!-- 空状态 -->
+        <div id="emptyState" class="empty-state">
+            <div class="empty-icon">📊</div>
+            <div>暂无交易数据</div>
+            <small>请选择时间范围后点击查询</small>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+let currentProjectId = null;
+let currentData = null;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    // Get projectId
+    const urlParams = new URLSearchParams(window.location.search);
+    currentProjectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!currentProjectId) {
+        showError('未选择项目，请返回首页选择');
+        return;
+    }
+    
+    // Load and display project info
+    try {
+        const project = await API.get(`/projects/${currentProjectId}/`);
+        document.getElementById('projectBadge').textContent = `项目: ${project.name}`;
+        document.getElementById('projectBadge').style.display = 'inline-block';
+    } catch (error) {
+        console.error('Failed to load project:', error);
+    }
+    
+    // Load sectors for filter
+    await loadSectors();
+    
+    // Set default date range (last 30 days)
+    const toDate = new Date();
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 30);
+    
+    document.getElementById('toDate').value = toDate.toISOString().split('T')[0];
+    document.getElementById('fromDate').value = fromDate.toISOString().split('T')[0];
+    
+    // Auto load data
+    applyFilter();
+});
+
+async function loadSectors() {
+    if (!currentProjectId) return;
+    
+    try {
+        const response = await API.get(`/securities/?project=${currentProjectId}`);
+        const securities = response.results || response;
+        
+        // Extract unique sectors
+        const sectors = [...new Set(securities.map(s => s.sector).filter(s => s))];
+        
+        const select = document.getElementById('sectorFilter');
+        sectors.forEach(sector => {
+            const option = document.createElement('option');
+            option.value = sector;
+            option.textContent = sector;
+            select.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load sectors:', error);
+    }
+}
+
+async function applyFilter() {
+    if (!currentProjectId) return;
+    
+    const fromDate = document.getElementById('fromDate').value;
+    const toDate = document.getElementById('toDate').value;
+    const assetClass = document.getElementById('assetClassFilter').value;
+    const sector = document.getElementById('sectorFilter').value;
+    
+    // Build query params
+    let queryParams = `project=${currentProjectId}`;
+    if (fromDate) queryParams += `&from=${fromDate}T00:00:00`;
+    if (toDate) queryParams += `&to=${toDate}T23:59:59`;
+    if (assetClass) queryParams += `&asset_class=${encodeURIComponent(assetClass)}`;
+    if (sector) queryParams += `&sector=${encodeURIComponent(sector)}`;
+    
+    try {
+        const data = await API.get(`/securities/trade-summary/?${queryParams}`);
+        currentData = data;
+        
+        if (data.by_security.length === 0) {
+            showEmptyState();
+        } else {
+            hideEmptyState();
+            renderOverview(data);
+            renderSectorSummary(data.by_sector);
+            renderSecurityDetail(data.by_security);
+        }
+    } catch (error) {
+        console.error('Failed to load trade summary:', error);
+        showError('加载统计数据失败');
+    }
+}
+
+function showEmptyState() {
+    document.getElementById('emptyState').style.display = 'block';
+    document.getElementById('overviewStats').style.display = 'none';
+    document.getElementById('sectorSummary').style.display = 'none';
+    document.getElementById('securityDetail').style.display = 'none';
+}
+
+function hideEmptyState() {
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('overviewStats').style.display = 'block';
+    document.getElementById('sectorSummary').style.display = 'block';
+    document.getElementById('securityDetail').style.display = 'block';
+}
+
+function renderOverview(data) {
+    let totalTrades = 0;
+    let totalBuy = 0;
+    let totalSell = 0;
+    
+    data.by_security.forEach(item => {
+        totalTrades += item.trade_count;
+        totalBuy += item.buy_total;
+        totalSell += item.sell_total;
+    });
+    
+    const netFlow = totalSell - totalBuy;
+    
+    document.getElementById('totalTrades').textContent = totalTrades;
+    document.getElementById('totalBuy').textContent = formatCurrency(totalBuy);
+    document.getElementById('totalSell').textContent = formatCurrency(totalSell);
+    document.getElementById('netFlow').textContent = formatCurrency(netFlow);
+    document.getElementById('netFlow').style.color = netFlow >= 0 ? '#28a745' : '#dc3545';
+}
+
+function renderSectorSummary(sectors) {
+    if (!sectors || sectors.length === 0) {
+        document.getElementById('sectorSummary').style.display = 'none';
+        return;
+    }
+    
+    const html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>行业</th>
+                    <th>标的数</th>
+                    <th>交易次数</th>
+                    <th>买入总额</th>
+                    <th>卖出总额</th>
+                    <th>净流量</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${sectors.map(sector => `
+                    <tr>
+                        <td><strong>${sector.sector}</strong></td>
+                        <td>${sector.symbol_count}</td>
+                        <td>${sector.trade_count}</td>
+                        <td style="color: #28a745;">${formatCurrency(sector.buy_total)}</td>
+                        <td style="color: #dc3545;">${formatCurrency(sector.sell_total)}</td>
+                        <td style="color: ${sector.net_flow >= 0 ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                            ${formatCurrency(sector.net_flow)}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    document.getElementById('sectorTable').innerHTML = html;
+}
+
+function renderSecurityDetail(securities) {
+    if (!securities || securities.length === 0) {
+        document.getElementById('securityDetail').style.display = 'none';
+        return;
+    }
+    
+    const html = `
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>资产类别</th>
+                    <th>代码</th>
+                    <th>名称</th>
+                    <th>行业</th>
+                    <th>交易次数</th>
+                    <th>买入数量</th>
+                    <th>卖出数量</th>
+                    <th>买入总额</th>
+                    <th>卖出总额</th>
+                    <th>净流量</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${securities.map(item => `
+                    <tr>
+                        <td><span class="badge badge-${getAssetClassBadge(item.asset_class)}">${item.asset_class_display || item.asset_class}</span></td>
+                        <td><strong>${item.symbol}</strong></td>
+                        <td>${item.name}</td>
+                        <td>${item.sector || '-'}</td>
+                        <td>${item.trade_count}</td>
+                        <td>${item.buy_quantity}</td>
+                        <td>${item.sell_quantity}</td>
+                        <td style="color: #28a745;">${formatCurrency(item.buy_total)}</td>
+                        <td style="color: #dc3545;">${formatCurrency(item.sell_total)}</td>
+                        <td style="color: ${item.net_flow >= 0 ? '#28a745' : '#dc3545'}; font-weight: bold;">
+                            ${formatCurrency(item.net_flow)}
+                        </td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+    
+    document.getElementById('securityTable').innerHTML = html;
+}
+
+function getAssetClassBadge(assetClass) {
+    const badges = {
+        'US_STOCK': 'primary',
+        'HK_STOCK': 'success',
+        'CRYPTO': 'warning'
+    };
+    return badges[assetClass] || 'secondary';
+}
+</script>
+
+<style>
+.filter-section {
+    animation: slideDown 0.3s ease-out;
+}
+
+.table-container {
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.data-table thead {
+    background: var(--primary-color);
+    color: white;
+}
+
+.data-table th,
+.data-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.data-table th {
+    font-weight: 600;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.data-table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+@media (max-width: 768px) {
+    .data-table {
+        font-size: 12px;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 8px 6px;
+    }
+}
+</style>
+{% endblock %}

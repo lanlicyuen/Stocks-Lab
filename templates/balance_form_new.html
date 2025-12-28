@@ -1,0 +1,182 @@
+{% extends 'base_new.html' %}
+
+{% block title %}新建日结余 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="javascript:history.back()">返回项目</a>
+    <a href="#">新建结余</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">新建日结余</h2>
+        <span id="projectBadge" class="badge badge-primary" style="display: none;"></span>
+    </div>
+    <div class="card-body">
+        <form id="balanceForm">
+            <div class="form-group">
+                <label>日期 <span style="color: red;">*</span></label>
+                <input type="date" id="date" class="form-control" required>
+                <small class="form-text">默认为今天，可修改</small>
+            </div>
+            
+            <div class="form-group">
+                <label>账户余额 <span style="color: red;">*</span></label>
+                <input type="number" id="amount" class="form-control" step="0.01" required placeholder="请输入当日账户总余额" min="0">
+                <small class="form-text">输入当日收盘后的账户总余额（单位：元）</small>
+            </div>
+            
+            <div class="form-group">
+                <label>备注</label>
+                <textarea id="note" class="form-control" rows="4" placeholder="可选，记录一些说明（如：今日操作、市场情况等）"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>附件上传</label>
+                <input type="file" id="attachments" class="form-control" multiple accept="image/*,.pdf">
+                <small class="form-text">支持多张图片或PDF，单个文件不超过10MB（可上传账户截图等）</small>
+            </div>
+            
+            <div id="attachmentPreview" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()">取消</button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">提交</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+// Preview attachments
+document.getElementById('attachments').addEventListener('change', function(e) {
+    const preview = document.getElementById('attachmentPreview');
+    preview.innerHTML = '';
+    
+    Array.from(e.target.files).forEach(file => {
+        if (file.size > 10 * 1024 * 1024) {
+            showError(`文件 ${file.name} 超过10MB限制`);
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.width = '100px';
+            img.style.height = '100px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '4px';
+            img.style.border = '1px solid #ddd';
+            preview.appendChild(img);
+        };
+        
+        if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+        } else {
+            const div = document.createElement('div');
+            div.textContent = file.name;
+            div.style.padding = '10px';
+            div.style.border = '1px solid #ddd';
+            div.style.borderRadius = '4px';
+            preview.appendChild(div);
+        }
+    });
+});
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').value = today;
+    
+    // Get projectId and display project info
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!projectId) {
+        showError('未选择项目，请返回首页选择');
+        document.getElementById('submitBtn').disabled = true;
+        return;
+    }
+    
+    // Load and display project info
+    try {
+        const project = await API.get(`/projects/${projectId}/`);
+        document.getElementById('projectBadge').textContent = `项目: ${project.name}`;
+        document.getElementById('projectBadge').style.display = 'inline-block';
+    } catch (error) {
+        console.error('Failed to load project:', error);
+    }
+});
+
+// Form submission
+document.getElementById('balanceForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+    
+    // Get projectId from URL parameter or localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!projectId) {
+        showError('请先选择项目');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+        return;
+    }
+    
+    const date = document.getElementById('date').value;
+    const amount = document.getElementById('amount').value;
+    const note = document.getElementById('note').value;
+    
+    if (!date || !amount) {
+        showError('请填写必填项');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+        return;
+    }
+    
+    try {
+        // Create balance record
+        const balance = await API.post('/balances/', {
+            project: projectId,
+            date: date,
+            amount: parseFloat(amount),
+            note: note || ''
+        });
+        
+        // Upload attachments if any
+        const files = document.getElementById('attachments').files;
+        if (files.length > 0) {
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('owner_type', 'BALANCE');
+                formData.append('owner_id', balance.id);
+                
+                await API.upload('/attachments/', formData);
+            }
+        }
+        
+        showSuccess('日结余创建成功！');
+        setTimeout(() => {
+            window.location.href = `/projects/${projectId}/dashboard/`;
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Create balance failed:', error);
+        showError('创建失败：' + (error.message || '未知错误'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+    }
+});
+</script>
+{% endblock %}

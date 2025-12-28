@@ -1,0 +1,348 @@
+from rest_framework import serializers
+from django.contrib.auth.models import User
+from .models import (
+    Trade, AuditLog, Security,
+    MarketAccount, CashAdjustment
+)
+from django.db.models import Sum, Q
+import markdown
+
+
+class UserSerializer(serializers.ModelSerializer):
+    """用户序列化器"""
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name']
+        read_only_fields = ['id']
+        project = Project.objects.create(
+            created_by=request.user,
+            **validated_data
+        )
+        # 创建者自动成为管理员
+        ProjectMember.objects.create(
+            project=project,
+            user=request.user,
+            role='ADMIN'
+        )
+        return project
+
+
+class ProjectMemberSerializer(serializers.ModelSerializer):
+    """项目成员序列化器"""
+    user = UserSerializer(read_only=True)
+    user_id = serializers.IntegerField(write_only=True)
+    
+    class Meta:
+        model = ProjectMember
+        fields = ['id', 'project', 'user', 'user_id', 'role', 'joined_at']
+        read_only_fields = ['id', 'project', 'joined_at']
+
+
+class ContributionSerializer(serializers.ModelSerializer):
+    """出资记录序列化器"""
+    user = UserSerializer(read_only=True)
+    created_by = UserSerializer(read_only=True)
+    
+    class Meta:
+        model = Contribution
+        fields = [
+            'id', 'project', 'user', 'amount', 'notes',
+            'contributed_at', 'created_at', 'created_by'
+        ]
+        read_only_fields = ['id', 'project', 'created_at', 'created_by']
+
+
+class DailyBalanceSerializer(serializers.ModelSerializer):
+    """每日结余序列化器"""
+    created_by = UserSerializer(read_only=True)
+    attachments_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DailyBalance
+        fields = [
+            'id', 'project', 'date', 'balance', 'notes',
+            'created_by', 'created_at', 'updated_at', 'attachments_count'
+        ]
+        read_only_fields = ['id', 'project', 'created_by', 'created_at', 'updated_at']
+    
+    def get_attachments_count(self, obj):
+        return Attachment.objects.filter(owner_type='BALANCE', owner_id=obj.id).count()
+
+
+class SecuritySerializer(serializers.ModelSerializer):
+    """标的主档序列化器"""
+    trade_count = serializers.SerializerMethodField()
+    asset_class_display = serializers.CharField(source='get_asset_class_display', read_only=True)
+    exchange_display = serializers.CharField(source='get_exchange_display', read_only=True)
+    
+    class Meta:
+        model = Security
+        fields = [
+            'id', 'account', 'symbol', 'name', 'asset_class', 'asset_class_display',
+            'sector', 'exchange', 'exchange_display',
+            'created_at', 'updated_at', 'trade_count'
+        ]
+        read_only_fields = ['id', 'account', 'created_at', 'updated_at']
+    
+    def get_trade_count(self, obj):
+        return obj.trades.count()
+
+
+class TradeSerializer(serializers.ModelSerializer):
+    """交易记录序列化器"""
+    security_info = SecuritySerializer(source='security', read_only=True)
+    account_info = serializers.SerializerMethodField()
+    thesis_html = serializers.SerializerMethodField()
+    review_html = serializers.SerializerMethodField()
+    total_amount = serializers.ReadOnlyField()
+    attachments_count = serializers.SerializerMethodField()
+    
+    # 用于创建时同时创建 Security
+    security_name = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    security_asset_class = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    security_sector = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    security_exchange = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    
+    class Meta:
+        model = Trade
+        fields = [
+            'id', 'account', 'account_info', 'security', 'security_info', 
+            'symbol', 'side', 'quantity', 'price', 'fee',
+            'executed_at', 'thesis', 'thesis_html', 'review', 'review_html',
+            'total_amount', 'created_at', 'updated_at', 'attachments_count',
+            'security_name', 'security_asset_class', 'security_sector', 'security_exchange'
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_account_info(self, obj):
+        """获取账户信息"""
+        if obj.account:
+            return {
+                'id': obj.account.id,
+                'name': obj.account.name,
+                'mode': obj.account.mode,
+                'mode_display': obj.account.get_mode_display(),
+                'market_type': obj.account.market_type,
+                'market_type_display': obj.account.get_market_type_display(),
+                'currency': obj.account.currency
+            }
+        return None
+    
+    def create(self, validated_data):
+        # 提取 Security 相关字段
+        security_name = validated_data.pop('security_name', None)
+        security_asset_class = validated_data.pop('security_asset_class', None)
+        security_sector = validated_data.pop('security_sector', None)
+        security_exchange = validated_data.pop('security_exchange', None)
+        
+        # 确保 symbol 大写
+        symbol = validated_data.get('symbol', '').upper()
+        validated_data['symbol'] = symbol
+        
+        # 查找或创建 Security
+        account = validated_data.get('account')
+        security = Security.objects.filter(account=account, symbol=symbol).first()
+        
+        if not security and security_name and security_asset_class:
+            # 创建新的 Security
+            security = Security.objects.create(
+                account=account,
+                symbol=symbol,
+                name=security_name,
+                asset_class=security_asset_class,
+                sector=security_sector or '',
+                exchange=security_exchange or ''
+            )
+        
+        # 关联 Security
+        if security:
+            validated_data['security'] = security
+        
+        return super().create(validated_data)
+    
+    def get_thesis_html(self, obj):
+        if obj.thesis:
+            return markdown.markdown(obj.thesis, extensions=['extra', 'codehilite'])
+        return ''
+    
+    def get_review_html(self, obj):
+        if obj.review:
+            return markdown.markdown(obj.review, extensions=['extra', 'codehilite'])
+        return ''
+    
+    def get_attachments_count(self, obj):
+        return Attachment.objects.filter(owner_type='TRADE', owner_id=obj.id).count()
+
+
+class AttachmentSerializer(serializers.ModelSerializer):
+    """附件序列化器"""
+    uploaded_by = UserSerializer(read_only=True)
+    file_url = serializers.SerializerMethodField()
+    file_name = serializers.SerializerMethodField()
+    download_url = serializers.SerializerMethodField()
+    preview_url = serializers.SerializerMethodField()
+    is_image = serializers.SerializerMethodField()
+    file_size = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Attachment
+        fields = [
+            'id', 'owner_type', 'owner_id', 'file', 'file_url', 'file_name',
+            'download_url', 'preview_url', 'is_image', 'file_size',
+            'uploaded_by', 'uploaded_at'
+        ]
+        read_only_fields = ['id', 'uploaded_by', 'uploaded_at']
+    
+    def get_file_url(self, obj):
+        """返回安全的下载 URL（受权限保护）"""
+        request = self.context.get('request')
+        if obj.file and request:
+            # 不再直接暴露 media URL，使用受控的下载端点
+            return request.build_absolute_uri(f'/api/v1/attachments/{obj.id}/download/')
+        return None
+    
+    def get_file_name(self, obj):
+        if obj.file:
+            import os
+            return os.path.basename(obj.file.name)
+        return None
+    
+    def get_download_url(self, obj):
+        """下载 URL（强制下载）"""
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(f'/api/v1/attachments/{obj.id}/download/?preview=false')
+        return None
+    
+    def get_preview_url(self, obj):
+        """预览 URL（图片内联显示）"""
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(f'/api/v1/attachments/{obj.id}/download/?preview=true')
+        return None
+    
+    def get_is_image(self, obj):
+        """判断是否是图片"""
+        if obj.file:
+            import mimetypes
+            content_type, _ = mimetypes.guess_type(obj.file.name)
+            return content_type and content_type.startswith('image/')
+        return False
+    
+    def get_file_size(self, obj):
+        """返回文件大小（字节）"""
+        if obj.file:
+            try:
+                return obj.file.size
+            except:
+                return 0
+        return 0
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    """审计日志序列化器"""
+    user = UserSerializer(read_only=True)
+    changes_dict = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'action', 'model_type', 'model_id',
+            'user', 'changes', 'changes_dict', 'created_at'
+        ]
+        read_only_fields = ['id', 'created_at']
+    
+    def get_changes_dict(self, obj):
+        return obj.get_changes_dict()
+
+
+class BalanceSummarySerializer(serializers.Serializer):
+    """净值曲线汇总序列化器"""
+    date = serializers.DateField()
+    balance = serializers.DecimalField(max_digits=15, decimal_places=2)
+    delta = serializers.DecimalField(max_digits=15, decimal_places=2)
+    return_pct = serializers.DecimalField(max_digits=10, decimal_places=4)
+
+
+class MarketAccountSerializer(serializers.ModelSerializer):
+    """市场账户序列化器"""
+    mode_display = serializers.CharField(source='get_mode_display', read_only=True)
+    market_type_display = serializers.CharField(source='get_market_type_display', read_only=True)
+    currency_display = serializers.CharField(source='get_currency_display', read_only=True)
+    trade_count = serializers.SerializerMethodField()
+    current_cash = serializers.SerializerMethodField()
+    total_pnl = serializers.SerializerMethodField()
+    return_pct = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = MarketAccount
+        fields = [
+            'id', 'owner', 'mode', 'mode_display', 'market_type', 'market_type_display',
+            'name', 'currency', 'currency_display', 'start_cash',
+            'created_at', 'updated_at',
+            'trade_count', 'current_cash', 'total_pnl', 'return_pct'
+        ]
+        read_only_fields = ['id', 'owner', 'created_at', 'updated_at']
+    
+    def get_trade_count(self, obj):
+        """获取交易笔数"""
+        return obj.trades.count()
+    
+    def get_current_cash(self, obj):
+        """计算当前现金余额"""
+        # 起始资金
+        cash = float(obj.start_cash)
+        
+        # 加上资金调整
+        adjustments = obj.adjustments.aggregate(total=Sum('amount'))['total'] or 0
+        cash += float(adjustments)
+        
+        # 减去买入金额（含手续费）
+        buy_trades = obj.trades.filter(side='BUY')
+        for trade in buy_trades:
+            cash -= float(trade.quantity) * float(trade.price) + float(trade.fee)
+        
+        # 加上卖出金额（减手续费）
+        sell_trades = obj.trades.filter(side='SELL')
+        for trade in sell_trades:
+            cash += float(trade.quantity) * float(trade.price) - float(trade.fee)
+        
+        return round(cash, 2)
+    
+    def get_total_pnl(self, obj):
+        """计算总盈亏"""
+        current_cash = self.get_current_cash(obj)
+        
+        # 调整后的起始资金
+        adjustments = obj.adjustments.aggregate(total=Sum('amount'))['total'] or 0
+        adjusted_start = float(obj.start_cash) + float(adjustments)
+        
+        # 盈亏 = 当前现金 - 调整后起始资金
+        return round(current_cash - adjusted_start, 2)
+    
+    def get_return_pct(self, obj):
+        """计算收益率"""
+        total_pnl = self.get_total_pnl(obj)
+        
+        # 调整后的起始资金
+        adjustments = obj.adjustments.aggregate(total=Sum('amount'))['total'] or 0
+        adjusted_start = float(obj.start_cash) + float(adjustments)
+        
+        if adjusted_start == 0:
+            return 0
+        
+        return round((total_pnl / adjusted_start) * 100, 4)
+
+
+class CashAdjustmentSerializer(serializers.ModelSerializer):
+    """资金调整序列化器"""
+    account_name = serializers.CharField(source='account.name', read_only=True)
+    
+    class Meta:
+        model = CashAdjustment
+        fields = [
+            'id', 'account', 'account_name', 'date', 'amount', 'reason',
+            'attachment', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'account', 'created_at', 'updated_at']

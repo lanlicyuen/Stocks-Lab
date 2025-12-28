@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">登录 - 投资项目披露平台</title>
+    <script src="/static/js/i18n.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .login-container {
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        .logo-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .logo-subtitle {
+            font-size: 14px;
+            color: #95a5a6;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+            margin-top: 10px;
+        }
+        
+        .btn-login:active {
+            transform: scale(0.98);
+        }
+        
+        .alert {
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        
+        .alert-danger {
+            background: #fee;
+            color: #c33;
+            border: 1px solid #fcc;
+        }
+        
+        .test-accounts {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+        }
+        
+        .test-accounts-title {
+            font-size: 13px;
+            color: #95a5a6;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .test-account {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .test-account-info {
+            color: #555;
+        }
+        
+        .test-account-badge {
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        
+        .badge-admin {
+            background: #fee;
+            color: #c33;
+        }
+        
+        .badge-viewer {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .footer {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #ecf0f1;
+            text-align: center;
+        }
+        
+        .footer-disclaimer {
+            font-size: 12px;
+            color: #95a5a6;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        
+        .footer-copyright {
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+        
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .footer-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
+        }
+        
+        .lang-switcher {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 5px;
+            background: rgba(255, 255, 255, 0.15);
+            padding: 6px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+        
+        .lang-btn {
+            padding: 6px 14px;
+            border: none;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .lang-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .lang-btn.active {
+            background: white;
+            color: #667eea;
+        }
+        
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 30px 20px;
+            }
+            
+            .logo-title {
+                font-size: 20px;
+            }
+            
+            .footer-disclaimer {
+                font-size: 11px;
+            }
+            
+            .footer-copyright {
+                font-size: 11px;
+            }
+            
+            .lang-switcher {
+                top: 10px;
+                right: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Language Switcher -->
+    <div class="lang-switcher">
+        <button class="lang-btn" id="lang-zh" onclick="setLanguage('zh-hans')">中文</button>
+        <button class="lang-btn" id="lang-en" onclick="setLanguage('en')">English</button>
+    </div>
+    
+    <div class="login-container">
+        <div class="login-card">
+            <div class="logo">
+                <div class="logo-icon">📊</div>
+                <div class="logo-title" id="logo-title">投资披露平台</div>
+                <div class="logo-subtitle" id="logo-subtitle">Stocks-Lab</div>
+            </div>
+            
+            {% if form.errors %}
+            <div class="alert alert-danger" id="login-error">
+                用户名或密码错误
+            </div>
+            {% endif %}
+            
+            <form method="post">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label class="form-label" for="id_username" id="label-username">用户名</label>
+                    <input type="text" 
+                           name="username" 
+                           id="id_username"
+                           class="form-control" 
+                           placeholder="请输入用户名"
+                           required 
+                           autofocus>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label" for="id_password" id="label-password">密码</label>
+                    <input type="password" 
+                           name="password" 
+                           id="id_password"
+                           class="form-control" 
+                           placeholder="请输入密码"
+                           required>
+                </div>
+                
+                <button type="submit" class="btn-login" id="btn-login">登录</button>
+            </form>
+            
+            <div class="test-accounts">
+                <div class="test-accounts-title" id="test-accounts-title">测试账户</div>
+                <div class="test-account">
+                    <span class="test-account-info">admin / admin123</span>
+                    <span class="test-account-badge badge-admin" id="badge-admin">管理员</span>
+                </div>
+                <div class="test-account">
+                    <span class="test-account-info">viewer / viewer123</span>
+                    <span class="test-account-badge badge-viewer" id="badge-viewer">观察者</span>
+                </div>
+            </div>
+            
+            <div class="footer">
+                <div class="footer-disclaimer" id="footer-disclaimer">
+                    Stocks-Lab 为个人开发的投资记录/模拟工具，不构成任何投资建议。
+                </div>
+                <div class="footer-copyright">
+                    © 2025 1Plabs Dev · Support: <a href="http://support.1plabs.pro" class="footer-link" target="_blank" rel="noopener noreferrer">support.1plabs.pro</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Apply translations on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const lang = getCurrentLanguage();
+            document.getElementById('lang-' + (lang === 'zh-hans' ? 'zh' : 'en')).classList.add('active');
+            applyTranslations();
+        });
+        
+        function applyTranslations() {
+            const lang = getCurrentLanguage();
+            
+            // Update page title
+            document.getElementById('page-title').textContent = lang === 'zh-hans' ? 
+                '登录 - 投资项目披露平台' : 'Login - Investment Disclosure Platform';
+            
+            // Update logo
+            document.getElementById('logo-title').textContent = lang === 'zh-hans' ? 
+                '投资披露平台' : 'Stocks Lab';
+            document.getElementById('logo-subtitle').textContent = lang === 'zh-hans' ? 
+                'Stocks-Lab' : 'Simulation Trading · Data Analysis';
+            
+            // Update form labels
+            document.getElementById('label-username').textContent = t('username');
+            document.getElementById('label-password').textContent = t('password');
+            document.getElementById('id_username').placeholder = lang === 'zh-hans' ? 
+                '请输入用户名' : 'Enter username';
+            document.getElementById('id_password').placeholder = lang === 'zh-hans' ? 
+                '请输入密码' : 'Enter password';
+            document.getElementById('btn-login').textContent = t('login_button');
+            
+            // Update test accounts section
+            document.getElementById('test-accounts-title').textContent = lang === 'zh-hans' ? 
+                '测试账户' : 'Test Accounts';
+            document.getElementById('badge-admin').textContent = lang === 'zh-hans' ? 
+                '管理员' : 'Admin';
+            document.getElementById('badge-viewer').textContent = lang === 'zh-hans' ? 
+                '观察者' : 'Viewer';
+            
+            // Update footer
+            document.getElementById('footer-disclaimer').textContent = lang === 'zh-hans' ? 
+                'Stocks-Lab 为个人开发的投资记录/模拟工具，不构成任何投资建议。' : 
+                'Stocks-Lab is a personal investment recording/simulation tool and does not constitute any investment advice.';
+            
+            // Update error message if exists
+            const errorMsg = document.getElementById('login-error');
+            if (errorMsg) {
+                errorMsg.textContent = lang === 'zh-hans' ? 
+                    '用户名或密码错误' : 'Invalid username or password';
+            }
+        }
+    </script>
+</body>
+</html>

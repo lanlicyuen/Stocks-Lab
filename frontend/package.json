@@ -1,0 +1,13 @@
+{
+  "name": "stocks-lab-frontend",
+  "version": "1.0.0",
+  "description": "Stocks-Lab Frontend Development Server",
+  "scripts": {
+    "dev": "vite --port 20003 --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --port 20003"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  }
+}

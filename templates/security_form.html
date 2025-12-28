@@ -1,0 +1,240 @@
+{% extends 'base_new.html' %}
+
+{% block title %}新增股票 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span id="nav-home">首页</span></a>
+    <a href="{% url 'accounts_list' %}"><span id="nav-account-list">账户列表</span></a>
+    <a href="{% url 'account_detail' account_id %}"><span id="nav-account-detail">账户详情</span></a>
+    <a href="#" class="active"><span id="nav-add-security">新增股票</span></a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" id="page-title">新增交易股票</h2>
+    </div>
+    <div class="card-body">
+        <form id="securityForm">
+            <div class="form-group">
+                <label for="symbol"><span id="label-symbol">标的代码</span> *</label>
+                <input type="text" id="symbol" name="symbol" class="form-control" 
+                       placeholder="" required 
+                       style="text-transform: uppercase;">
+                <small class="form-text" id="hint-symbol">代码将自动转为大写</small>
+            </div>
+
+            <div class="form-group">
+                <label for="name"><span id="label-name">股票名称</span> *</label>
+                <input type="text" id="name" name="name" class="form-control" 
+                       placeholder="" required>
+            </div>
+
+            <div class="form-group">
+                <label for="asset_type"><span id="label-asset-type">资产类型</span> *</label>
+                <select id="asset_type" name="asset_type" class="form-control" required>
+                    <option value="" id="opt-select-placeholder">请选择...</option>
+                    <option value="STOCK" id="opt-stock">股票</option>
+                    <option value="ETF" id="opt-etf">ETF</option>
+                    <option value="CRYPTO" id="opt-crypto">加密货币</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="sector"><span id="label-sector">行业分类</span></label>
+                <input type="text" id="sector" name="sector" class="form-control" 
+                       placeholder="">
+            </div>
+
+            <div class="form-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary">
+                    <span id="submitText">创建股票</span>
+                    <span id="submitLoading" style="display: none;">处理中...</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()"><span id="btn-cancel">取消</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 12px;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+
+.alert {
+    padding: 12px 20px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+.alert-error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.alert-success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+</style>
+
+<script>
+const accountId = {{ account_id }};
+
+// 自动转大写
+document.getElementById('symbol').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
+
+document.getElementById('securityForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitText = document.getElementById('submitText');
+    const submitLoading = document.getElementById('submitLoading');
+    
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    submitLoading.style.display = 'inline';
+    
+    try {
+        const formData = {
+            account: accountId,
+            symbol: document.getElementById('symbol').value.toUpperCase(),
+            name: document.getElementById('name').value,
+            asset_type: document.getElementById('asset_type').value,
+            sector: document.getElementById('sector').value || ''
+        };
+        
+        const response = await fetch('/api/v1/securities/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': API.getCookie('csrftoken')
+            },
+            credentials: 'include',
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert(`股票 ${data.symbol} 创建成功！`);
+            window.location.href = `/accounts/${accountId}/`;
+        } else {
+            let errorMsg = '创建失败：\n';
+            if (data.symbol && data.symbol.includes('already exists')) {
+                errorMsg += '该股票代码已存在';
+            } else {
+                errorMsg += JSON.stringify(data, null, 2);
+            }
+            alert(errorMsg);
+            
+            submitBtn.disabled = false;
+            submitText.style.display = 'inline';
+            submitLoading.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('网络错误，请稍后重试');
+        
+        submitBtn.disabled = false;
+        submitText.style.display = 'inline';
+        submitLoading.style.display = 'none';
+    }
+});
+
+// Apply translations
+document.addEventListener('DOMContentLoaded', function() {
+    const translations = {
+        'nav-home': 'home',
+        'nav-account-list': 'account_list',
+        'nav-account-detail': 'account_detail',
+        'nav-add-security': 'add_security',
+        'page-title': 'add_security_title',
+        'label-symbol': 'symbol_label',
+        'hint-symbol': 'symbol_hint',
+        'label-name': 'security_name',
+        'label-asset-type': 'asset_type_label',
+        'opt-select-placeholder': 'select_placeholder',
+        'opt-stock': 'asset_type_stock',
+        'opt-etf': 'asset_type_etf',
+        'opt-crypto': 'asset_type_crypto',
+        'label-sector': 'sector_label',
+        'submitText': 'create_security',
+        'submitLoading': 'processing',
+        'btn-cancel': 'cancel'
+    };
+    
+    for (const [id, key] of Object.entries(translations)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    }
+    
+    // Update placeholders
+    document.getElementById('symbol').placeholder = t('symbol_placeholder');
+    document.getElementById('name').placeholder = t('security_name_placeholder');
+    document.getElementById('sector').placeholder = t('sector_placeholder');
+});
+</script>
+
+{% endblock %}

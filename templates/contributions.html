@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+
+{% block page_title %}出资记录 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">{{ project.name }} - 出资记录</div>
+    
+    {% if my_role == 'ADMIN' %}
+    <p style="color: #666; font-size: 13px; margin: 10px 0;">
+        注意：新增出资记录需要通过 API 或管理后台操作
+    </p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title">出资列表</div>
+    {% if contributions %}
+    {% for contribution in contributions %}
+    <div class="list-item">
+        <div class="list-item-title">
+            {{ contribution.user.username }}
+            <span style="float: right; color: #27ae60; font-weight: 700;">
+                ¥{{ contribution.amount|floatformat:2 }}
+            </span>
+        </div>
+        <div class="list-item-meta">
+            出资日期: {{ contribution.contributed_at }} | 记录人: {{ contribution.created_by.username }}
+        </div>
+        {% if contribution.notes %}
+        <div style="margin-top: 5px; font-size: 13px; color: #666;">
+            {{ contribution.notes }}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info">暂无出资记录</div>
+    {% endif %}
+</div>
+{% endblock %}

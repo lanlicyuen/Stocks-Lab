@@ -1,0 +1,237 @@
+{% extends 'base_new.html' %}
+
+{% block title %}交易详情 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="{% url 'trades' %}">交易记录</a>
+    <a href="#">详情</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" id="tradeTitle">交易详情</h2>
+        {% if user_role == 'ADMIN' %}
+        <button class="btn btn-danger btn-sm" onclick="deleteTrade()">删除</button>
+        {% endif %}
+    </div>
+    <div class="card-body" id="tradeDetail">
+        <div class="loading">
+            <div class="spinner"></div>
+            <div>加载中...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Attachments Section -->
+<div class="card" id="attachmentsSection" style="display: none;">
+    <div class="card-header">
+        <h2 class="card-title">附件</h2>
+    </div>
+    <div class="card-body">
+        <div id="attachmentsList" style="display: flex; flex-wrap: wrap; gap: 15px;"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_script %}
+<script src="https://cdn.jsdelivr.net/npm/marked@4.0.0/marked.min.js"></script>
+<script>
+const userRole = '{{ user_role }}';
+let currentTradeId = null;
+
+async function loadTradeDetail() {
+    // Get trade ID from URL
+    const pathParts = window.location.pathname.split('/');
+    currentTradeId = pathParts[pathParts.length - 2]; // /trades/{id}/
+    
+    if (!currentTradeId) {
+        showError('无效的交易ID');
+        return;
+    }
+    
+    try {
+        const trade = await API.get(`/trades/${currentTradeId}/`);
+        renderTradeDetail(trade);
+        loadAttachments();
+    } catch (error) {
+        console.error('Failed to load trade:', error);
+        showError('加载失败，请刷新重试');
+    }
+}
+
+function renderTradeDetail(trade) {
+    const sideColor = trade.side === 'BUY' ? '#28a745' : '#dc3545';
+    const sideName = trade.side === 'BUY' ? '买入' : '卖出';
+    
+    document.getElementById('tradeTitle').textContent = `${trade.symbol} - ${sideName}`;
+    
+    // Render thesis with Markdown
+    const thesisHtml = marked.parse(trade.thesis);
+    
+    document.getElementById('tradeDetail').innerHTML = `
+        <div style="margin-bottom: 30px;">
+            <div class="form-row" style="margin-bottom: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">标的代码</label>
+                    <div style="font-size: 20px; font-weight: bold;">${trade.symbol}</div>
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">交易方向</label>
+                    <div>
+                        <span class="badge" style="background-color: ${sideColor}; font-size: 16px; padding: 5px 15px;">
+                            ${sideName}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-row" style="margin-bottom: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">成交价格</label>
+                    <div style="font-size: 18px;">${formatCurrency(trade.price)}</div>
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">数量</label>
+                    <div style="font-size: 18px;">${trade.quantity}</div>
+                </div>
+            </div>
+            
+            <div class="form-row" style="margin-bottom: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">成交金额</label>
+                    <div style="font-size: 20px; font-weight: bold; color: var(--primary-color);">
+                        ${formatCurrency(trade.total_amount)}
+                    </div>
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label style="font-weight: bold; margin-bottom: 5px;">交易日期</label>
+                    <div style="font-size: 18px;">${formatDate(trade.trade_date)}</div>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 15px;">
+                <label style="font-weight: bold; margin-bottom: 5px;">记录人</label>
+                <div>${trade.recorded_by.username}</div>
+            </div>
+            
+            <div>
+                <label style="font-weight: bold; margin-bottom: 5px;">创建时间</label>
+                <div>${formatDateTime(trade.created_at)}</div>
+            </div>
+        </div>
+        
+        <div style="border-top: 1px solid #ddd; padding-top: 20px;">
+            <h3 style="margin-bottom: 15px;">交易逻辑</h3>
+            <div class="markdown-content" style="line-height: 1.8;">
+                ${thesisHtml}
+            </div>
+        </div>
+    `;
+}
+
+async function loadAttachments() {
+    try {
+        const attachments = await API.get(`/attachments/?owner_type=TRADE&owner_id=${currentTradeId}`);
+        
+        if (attachments.length === 0) {
+            return;
+        }
+        
+        document.getElementById('attachmentsSection').style.display = 'block';
+        
+        const container = document.getElementById('attachmentsList');
+        container.innerHTML = attachments.map(att => `
+            <div style="position: relative;">
+                <img src="${att.preview_url}" 
+                     alt="${att.file_name}"
+                     style="width: 150px; height: 150px; object-fit: cover; border-radius: 4px; cursor: pointer;"
+                     onclick="window.open('${att.download_url}', '_blank')">
+                <div style="margin-top: 5px; font-size: 12px; color: #666; text-align: center; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                    ${att.file_name}
+                </div>
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Failed to load attachments:', error);
+    }
+}
+
+async function deleteTrade() {
+    if (!confirm('确定要删除这条交易记录吗？删除后无法恢复！')) return;
+    
+    try {
+        await API.delete(`/trades/${currentTradeId}/`);
+        showSuccess('删除成功！');
+        setTimeout(() => {
+            window.location.href = '/trades/';
+        }, 1500);
+    } catch (error) {
+        showError('删除失败：' + error.message);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadTradeDetail();
+});
+</script>
+
+<style>
+.markdown-content h1, .markdown-content h2, .markdown-content h3 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.markdown-content h1 { font-size: 24px; }
+.markdown-content h2 { font-size: 20px; }
+.markdown-content h3 { font-size: 18px; }
+
+.markdown-content p {
+    margin-bottom: 10px;
+}
+
+.markdown-content ul, .markdown-content ol {
+    margin-left: 20px;
+    margin-bottom: 10px;
+}
+
+.markdown-content li {
+    margin-bottom: 5px;
+}
+
+.markdown-content code {
+    background-color: #f5f5f5;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+}
+
+.markdown-content pre {
+    background-color: #f5f5f5;
+    padding: 15px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin-bottom: 10px;
+}
+
+.markdown-content blockquote {
+    border-left: 4px solid var(--primary-color);
+    padding-left: 15px;
+    margin-left: 0;
+    color: #666;
+}
+
+.markdown-content a {
+    color: var(--primary-color);
+    text-decoration: underline;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,448 @@
+{% extends 'base_new.html' %}
+
+{% block title %}{{ project_name }} - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="{% url 'dashboard' %}">账户列表</a>
+    <a href="#" class="active" id="projectName">项目详情</a>
+</div>
+
+<!-- Project Header -->
+<div class="card">
+    <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button onclick="window.history.back()" class="btn btn-secondary btn-sm" style="padding: 5px 10px;">
+                    ← 返回
+                </button>
+                <h2 class="card-title" id="projectTitle" style="margin: 0;">加载中...</h2>
+            </div>
+            <span class="badge" id="userRoleBadge" style="display: none;"></span>
+        </div>
+        <p id="projectDescription" style="color: #666; font-size: 14px; margin: 0;"></p>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+        <div class="stat-label">最新结余</div>
+        <div class="stat-value" id="latestBalance">-</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;" id="balanceDate">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">累计盈亏</div>
+        <div class="stat-value" id="totalPnL">-</div>
+        <div style="font-size: 12px; color: #888; margin-top: 5px;" id="pnlPercent">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">交易笔数</div>
+        <div class="stat-value" id="tradeCount">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">成员数</div>
+        <div class="stat-value" id="memberCount">-</div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="card" id="quickActions" style="display: none;">
+    <div class="card-header">
+        <h2 class="card-title">快速操作</h2>
+    </div>
+    <div class="card-body">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+            <button class="btn btn-primary" onclick="window.location.href='/balances/create/?project=' + projectId">
+                📊 新增今日结余
+            </button>
+            <button class="btn btn-primary" onclick="window.location.href='/trades/create/?project=' + projectId">
+                💹 新增交易记录
+            </button>
+            <button class="btn btn-secondary" onclick="window.location.href='/trades/analysis/?project=' + projectId">
+                📈 分类复盘统计
+            </button>
+            <button class="btn btn-success" onclick="window.location.href='/accounts/create/?project=' + projectId">
+                💰 新增市场账户
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Market Accounts -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">市场账户</h2>
+        <button class="btn btn-primary btn-sm" id="addAccountBtn" style="display: none;" onclick="window.location.href='/accounts/create/?project=' + projectId">
+            + 新增账户
+        </button>
+    </div>
+    <div class="card-body">
+        <div id="marketAccounts">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Activity -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">最近结余记录</h2>
+        <a href="/balances/?project=" id="viewAllBalances" class="btn btn-secondary btn-sm">查看全部</a>
+    </div>
+    <div class="card-body">
+        <div id="recentBalances">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">最近交易记录</h2>
+        <a href="/trades/?project=" id="viewAllTrades" class="btn btn-secondary btn-sm">查看全部</a>
+    </div>
+    <div class="card-body">
+        <div id="recentTrades">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAB for mobile (ADMIN only) -->
+<button class="fab" id="fabButton" style="display: none;" onclick="showActionMenu()" title="快速操作">
+    +
+</button>
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const userRole = '{{ user_role }}';
+let projectId = null;
+let projectData = null;
+
+// Get projectId from URL
+function getProjectIdFromUrl() {
+    const pathParts = window.location.pathname.split('/');
+    return pathParts[2]; // /projects/{id}/dashboard
+}
+
+// Load project dashboard
+async function loadProjectDashboard() {
+    projectId = getProjectIdFromUrl();
+    
+    if (!projectId) {
+        showError('无效的项目ID');
+        setTimeout(() => window.location.href = '/', 2000);
+        return;
+    }
+    
+    try {
+        // Load project info
+        projectData = await API.get(`/projects/${projectId}/`);
+        
+        // Update project header
+        document.getElementById('projectTitle').textContent = projectData.name;
+        document.getElementById('projectName').textContent = projectData.name;
+        document.getElementById('projectDescription').textContent = projectData.description || '暂无描述';
+        
+        // Update role badge
+        const roleBadge = document.getElementById('userRoleBadge');
+        if (projectData.my_role) {
+            roleBadge.textContent = projectData.my_role === 'ADMIN' ? '管理员' : '观察者';
+            roleBadge.className = `badge ${projectData.my_role === 'ADMIN' ? 'badge-danger' : 'badge-primary'}`;
+            roleBadge.style.display = 'inline-block';
+            
+            // Show quick actions for ADMIN
+            if (projectData.my_role === 'ADMIN') {
+                document.getElementById('quickActions').style.display = 'block';
+                document.getElementById('fabButton').style.display = 'flex';
+            }
+        }
+        
+        // Update member count
+        document.getElementById('memberCount').textContent = projectData.member_count || 0;
+        
+        // Update view all links
+        document.getElementById('viewAllBalances').href = `/balances/?project=${projectId}`;
+        document.getElementById('viewAllTrades').href = `/trades/?project=${projectId}`;
+        
+        // Load stats and recent data
+        await Promise.all([
+            loadBalanceStats(),
+            loadTradeStats(),
+            loadMarketAccounts(),
+            loadRecentBalances(),
+            loadRecentTrades()
+        ]);
+        
+        // Save to localStorage
+        setCurrentProject(projectId);
+        
+    } catch (error) {
+        console.error('Failed to load project:', error);
+        if (error.message.includes('403')) {
+            showError('您没有权限访问此项目');
+            setTimeout(() => window.location.href = '/', 2000);
+        } else if (error.message.includes('404')) {
+            showError('项目不存在');
+            setTimeout(() => window.location.href = '/', 2000);
+        } else {
+            showError('加载失败，请刷新重试');
+        }
+    }
+}
+
+// Load balance statistics
+async function loadBalanceStats() {
+    try {
+        const balances = await API.get(`/balances/?project=${projectId}&ordering=-date&page_size=1`);
+        const balanceList = balances.results || balances;
+        
+        if (balanceList.length > 0) {
+            const latest = balanceList[0];
+            document.getElementById('latestBalance').textContent = formatCurrency(latest.amount);
+            document.getElementById('balanceDate').textContent = new Date(latest.date).toLocaleDateString('zh-CN');
+            
+            // Calculate PnL (总投入 vs 最新余额)
+            const contributions = await API.get(`/contributions/?project=${projectId}`);
+            const contribList = contributions.results || contributions;
+            const totalInvestment = contribList.reduce((sum, c) => sum + parseFloat(c.amount), 0);
+            
+            if (totalInvestment > 0) {
+                const currentAmount = parseFloat(latest.amount);
+                const pnl = currentAmount - totalInvestment;
+                const pnlPercent = (pnl / totalInvestment * 100).toFixed(2);
+                
+                document.getElementById('totalPnL').textContent = formatCurrency(pnl);
+                document.getElementById('totalPnL').style.color = pnl >= 0 ? '#28a745' : '#dc3545';
+                document.getElementById('pnlPercent').textContent = `${pnl >= 0 ? '+' : ''}${pnlPercent}%`;
+            } else {
+                // 无投入记录时，显示当前余额但不计算盈亏
+                document.getElementById('totalPnL').textContent = '-';
+                document.getElementById('pnlPercent').textContent = '无投入记录';
+            }
+        } else {
+            // 无结余记录
+            document.getElementById('latestBalance').textContent = '暂无数据';
+            document.getElementById('balanceDate').textContent = '请添加结余记录';
+            document.getElementById('totalPnL').textContent = '-';
+            document.getElementById('pnlPercent').textContent = '-';
+        }
+    } catch (error) {
+        console.error('Failed to load balance stats:', error);
+        document.getElementById('latestBalance').textContent = '加载失败';
+        document.getElementById('balanceDate').textContent = '-';
+        document.getElementById('totalPnL').textContent = '-';
+        document.getElementById('pnlPercent').textContent = '-';
+    }
+}
+
+// Load trade statistics
+async function loadTradeStats() {
+    try {
+        const trades = await API.get(`/trades/?project=${projectId}`);
+        const tradeList = trades.results || trades;
+        document.getElementById('tradeCount').textContent = tradeList.length;
+    } catch (error) {
+        console.error('Failed to load trade stats:', error);
+        document.getElementById('tradeCount').textContent = '0';
+    }
+}
+
+// Load market accounts
+async function loadMarketAccounts() {
+    try {
+        const response = await API.get(`/market-accounts/?project=${projectId}`);
+        const accounts = response.results || response;
+        
+        // Show add button for ADMIN
+        if (projectData && projectData.my_role === 'ADMIN') {
+            document.getElementById('addAccountBtn').style.display = 'inline-block';
+        }
+        
+        if (accounts.length === 0) {
+            document.getElementById('marketAccounts').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">💰</div>
+                    <div>暂无市场账户</div>
+                    ${projectData && projectData.my_role === 'ADMIN' ? 
+                        `<button class="btn btn-primary" style="margin-top: 10px;" onclick="window.location.href='/accounts/create/?project=${projectId}'">创建第一个账户</button>` : ''}
+                </div>
+            `;
+            return;
+        }
+        
+        // Display accounts in grid
+        document.getElementById('marketAccounts').innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;">
+                ${accounts.map(acc => {
+                    const pnlColor = acc.total_pnl >= 0 ? '#28a745' : '#dc3545';
+                    const pnlSign = acc.total_pnl >= 0 ? '+' : '';
+                    const returnColor = acc.return_pct >= 0 ? '#28a745' : '#dc3545';
+                    const returnSign = acc.return_pct >= 0 ? '+' : '';
+                    
+                    return `
+                        <div class="mobile-card" style="cursor: pointer;" onclick="window.location.href='/accounts/${acc.id}/'">
+                            <div class="mobile-card-primary">
+                                <span>${acc.name}</span>
+                                <span class="badge badge-primary">${acc.market_type_display}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">币种</span>
+                                <span class="mobile-card-value">${acc.currency}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">起始资金</span>
+                                <span class="mobile-card-value">${formatCurrency(acc.start_cash)}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">当前现金</span>
+                                <span class="mobile-card-value" style="font-weight: bold;">${formatCurrency(acc.current_cash)}</span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">盈亏</span>
+                                <span class="mobile-card-value" style="font-weight: bold; color: ${pnlColor};">
+                                    ${pnlSign}${formatCurrency(acc.total_pnl)}
+                                </span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">收益率</span>
+                                <span class="mobile-card-value" style="font-weight: bold; color: ${returnColor};">
+                                    ${returnSign}${acc.return_pct}%
+                                </span>
+                            </div>
+                            <div class="mobile-card-row">
+                                <span class="mobile-card-label">交易笔数</span>
+                                <span class="mobile-card-value">${acc.trade_count}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+        
+    } catch (error) {
+        console.error('Failed to load market accounts:', error);
+        document.getElementById('marketAccounts').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Load recent balances
+async function loadRecentBalances() {
+    try {
+        const response = await API.get(`/balances/?project=${projectId}&ordering=-date&page_size=5`);
+        const balances = response.results || response;
+        
+        if (balances.length === 0) {
+            document.getElementById('recentBalances').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📊</div>
+                    <div>暂无结余记录</div>
+                </div>
+            `;
+            return;
+        }
+        
+        document.getElementById('recentBalances').innerHTML = balances.map(b => `
+            <div class="mobile-card">
+                <div class="mobile-card-primary">${new Date(b.date).toLocaleDateString('zh-CN')}</div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">账户余额</span>
+                    <span class="mobile-card-value" style="font-weight: bold; color: var(--primary-color);">
+                        ${formatCurrency(b.amount)}
+                    </span>
+                </div>
+                ${b.note ? `
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">备注</span>
+                    <span class="mobile-card-value">${b.note}</span>
+                </div>
+                ` : ''}
+            </div>
+        `).join('');
+        
+    } catch (error) {
+        console.error('Failed to load recent balances:', error);
+        document.getElementById('recentBalances').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Load recent trades
+async function loadRecentTrades() {
+    try {
+        const response = await API.get(`/trades/?project=${projectId}&ordering=-trade_date&page_size=5`);
+        const trades = response.results || response;
+        
+        if (trades.length === 0) {
+            document.getElementById('recentTrades').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">💹</div>
+                    <div>暂无交易记录</div>
+                </div>
+            `;
+            return;
+        }
+        
+        document.getElementById('recentTrades').innerHTML = trades.map(t => {
+            const sideColor = t.side === 'BUY' ? '#28a745' : '#dc3545';
+            const sideName = t.side === 'BUY' ? '买入' : '卖出';
+            
+            return `
+                <div class="mobile-card" onclick="window.location.href='/trades/${t.id}/'">
+                    <div class="mobile-card-primary">
+                        <span>${t.symbol}</span>
+                        <span class="badge" style="background-color: ${sideColor};">${sideName}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">成交金额</span>
+                        <span class="mobile-card-value" style="font-weight: bold;">
+                            ${formatCurrency(t.total_amount)}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">交易日期</span>
+                        <span class="mobile-card-value">${new Date(t.trade_date).toLocaleDateString('zh-CN')}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Failed to load recent trades:', error);
+        document.getElementById('recentTrades').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Show action menu (mobile)
+function showActionMenu() {
+    const actions = [
+        { text: '📊 新增今日结余', url: `/balances/create/?project=${projectId}` },
+        { text: '💹 新增交易记录', url: `/trades/create/?project=${projectId}` }
+    ];
+    
+    const message = actions.map((a, i) => `${i + 1}. ${a.text}`).join('\n');
+    const choice = prompt(message + '\n\n请输入序号：');
+    
+    if (choice && actions[parseInt(choice) - 1]) {
+        window.location.href = actions[parseInt(choice) - 1].url;
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadProjectDashboard();
+});
+</script>
+{% endblock %}

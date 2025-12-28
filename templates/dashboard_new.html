@@ -1,0 +1,203 @@
+{% extends 'base_new.html' %}
+
+{% block title %}Dashboard - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav" style="display: none;">
+    <a href="{% url 'dashboard' %}" class="active">首页</a>
+    <a href="{% url 'dashboard' %}">账户列表</a>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card">
+        <div class="stat-label">项目数</div>
+        <div class="stat-value" id="projectCount">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">总投资</div>
+        <div class="stat-value" id="totalInvestment">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">今日盈亏</div>
+        <div class="stat-value" id="todayPnL">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">总收益率</div>
+        <div class="stat-value" id="totalReturn">-</div>
+    </div>
+</div>
+
+<!-- My Projects -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">我的项目</h2>
+        {% if user_role == 'ADMIN' %}
+        <a href="#" class="btn btn-primary btn-sm" onclick="showCreateProjectModal(); return false;">
+            + 新建项目
+        </a>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div id="projectsList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_script %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+const userRole = '{{ user_role }}';
+
+// Load dashboard data
+async function loadDashboard() {
+    try {
+        const response = await API.get('/projects/');
+        const projects = response.results || response; // 处理分页和非分页情况
+        
+        // Update stats
+        document.getElementById('projectCount').textContent = Array.isArray(projects) ? projects.length : 0;
+        
+        // Calculate total investment
+        let totalInv = 0;
+        for (const project of projects) {
+            try {
+                const contributions = await API.get(`/contributions/?project=${project.id}`);
+                contributions.forEach(c => totalInv += parseFloat(c.amount));
+            } catch (e) {
+                console.warn('Failed to load contributions for project', project.id);
+            }
+        }
+        document.getElementById('totalInvestment').textContent = formatCurrency(totalInv);
+        
+        // Mock data for now
+        document.getElementById('todayPnL').textContent = '+¥1,250';
+        document.getElementById('totalReturn').textContent = '+12.5%';
+        
+        // Render projects list
+        renderProjects(projects);
+        
+    } catch (error) {
+        console.error('Failed to load dashboard:', error);
+        document.getElementById('projectsList').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <div>加载失败</div>
+                <button class="btn btn-primary" onclick="loadDashboard()">重试</button>
+            </div>
+        `;
+    }
+}
+
+function renderProjects(projects) {
+    const container = document.getElementById('projectsList');
+    
+    if (projects.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <div>暂无项目</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = projects.map(project => `
+        <div class="mobile-card" onclick="selectProject(${project.id})">
+            <div class="mobile-card-primary">${project.name}</div>
+            ${project.description ? `
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">描述</span>
+                <span class="mobile-card-value">${project.description}</span>
+            </div>
+            ` : ''}
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">成员</span>
+                <span class="mobile-card-value">${project.member_count} 人</span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">我的角色</span>
+                <span class="badge ${project.my_role === 'ADMIN' ? 'badge-danger' : 'badge-primary'}">
+                    ${project.my_role === 'ADMIN' ? '管理员' : '观察者'}
+                </span>
+            </div>
+            <div class="mobile-card-row">
+                <span class="mobile-card-label">创建时间</span>
+                <span class="mobile-card-value">${new Date(project.created_at).toLocaleDateString('zh-CN')}</span>
+            </div>
+        </div>
+    `).join('');
+    
+    // Add desktop table
+    container.innerHTML += `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>项目名称</th>
+                        <th>我的角色</th>
+                        <th>成员数</th>
+                        <th>创建者</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${projects.map(p => `
+                        <tr>
+                            <td><strong>${p.name}</strong></td>
+                            <td>
+                                <span class="badge ${p.my_role === 'ADMIN' ? 'badge-danger' : 'badge-primary'}">
+                                    ${p.my_role === 'ADMIN' ? '管理员' : '观察者'}
+                                </span>
+                            </td>
+                            <td>${p.member_count}</td>
+                            <td>${p.created_by.username}</td>
+                            <td>${new Date(p.created_at).toLocaleDateString('zh-CN')}</td>
+                            <td>
+                                <button class="btn btn-primary btn-sm" onclick="selectProject(${p.id})">选择</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function showCreateProjectModal() {
+    const name = prompt('请输入项目名称：');
+    if (!name) return;
+    
+    const description = prompt('请输入项目描述（可选）：');
+    
+    createProject(name, description || '');
+}
+
+function selectProject(projectId) {
+    setCurrentProject(projectId);
+    window.location.href = `/projects/${projectId}/dashboard/`;
+}
+
+async function createProject(name, description) {
+    try {
+        await API.post('/projects/', { name, description });
+        showSuccess('项目创建成功！');
+        loadDashboard();
+    } catch (error) {
+        showError('创建失败：' + error.message);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadDashboard();
+});
+</script>
+{% endblock %}

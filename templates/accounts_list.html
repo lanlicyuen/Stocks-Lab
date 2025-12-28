@@ -1,0 +1,460 @@
+{% extends 'base_new.html' %}
+
+{% block title %}
+<span id="page-title">账户管理 - 投资项目披露平台</span>
+{% endblock %}
+
+{% block extra_head %}
+<script src="/static/js/i18n.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}" class="active" id="nav-home">首页</a>
+    <a href="{% url 'account_settings' %}" id="nav-settings">用户设置</a>
+    <a href="{% url 'accounts_manage' %}" id="nav-manage">管理账户</a>
+    <div style="margin-left: auto; display: flex; gap: 5px;">
+        <button class="lang-btn-nav" id="lang-zh" onclick="setLanguage('zh-hans')">中文</button>
+        <button class="lang-btn-nav" id="lang-en" onclick="setLanguage('en')">EN</button>
+    </div>
+</div>
+
+<!-- Mode Switcher -->
+<div class="card" style="margin-bottom: 10px;">
+    <div class="card-body" style="padding: 12px 15px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <span style="font-size: 14px; color: #666;" id="mode-label">账户模式：</span>
+            <button id="simModeBtn" class="btn btn-primary btn-sm" onclick="switchMode('SIM')">
+                🎮 <span id="mode-sim">模拟账号</span>
+            </button>
+            <button id="realModeBtn" class="btn btn-sm" onclick="switchMode('REAL')">
+                💰 <span id="mode-real">真实账号</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Market Accounts -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" id="accounts-title">市场账户</h2>
+        <button class="btn btn-primary btn-sm" onclick="showCreateModal()">+ <span id="btn-new-account">新增市场账户</span></button>
+    </div>
+    <div class="card-body">
+        <div id="accountsList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div id="loading-text">加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Account Modal -->
+<div id="createModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; padding: 20px; overflow-y: auto;">
+    <div style="background: white; max-width: 600px; margin: 50px auto; border-radius: 12px; padding: 0; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        <div style="padding: 20px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px;" id="modal-title">新增市场账户</h3>
+            <button onclick="hideCreateModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999;">&times;</button>
+        </div>
+        <form id="createForm" onsubmit="handleCreate(event)" style="padding: 20px;">
+            <div class="form-group">
+                <label for="market_type" class="required" id="label-market-type">市场类型</label>
+                <select id="market_type" class="form-control" required onchange="handleMarketTypeChange()">
+                    <option value="" id="option-select">-- 请选择 --</option>
+                    <option value="US_STOCK" id="option-us">美国股票</option>
+                    <option value="CN_A" id="option-cn">大陆A股</option>
+                    <option value="HK_STOCK" id="option-hk">香港港股</option>
+                    <option value="CRYPTO" id="option-crypto">加密货币</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="name" id="label-name">账户名称（可选）</label>
+                <input type="text" id="name" class="form-control" placeholder="">
+                <small class="form-text" id="name-hint">例如：我的美股账户</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="currency" class="required" id="label-currency">币种</label>
+                <select id="currency" class="form-control" required>
+                    <option value="" id="currency-select">-- 请选择 --</option>
+                    <option value="USD">USD</option>
+                    <option value="CNY">CNY</option>
+                    <option value="HKD">HKD</option>
+                    <option value="USDT">USDT</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="start_cash" class="required" id="label-start-cash">起始资金</label>
+                <input type="number" id="start_cash" class="form-control" placeholder="100000" step="0.01" min="0" required>
+            </div>
+            
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button type="button" class="btn btn-secondary" onclick="hideCreateModal()" id="btn-cancel">取消</button>
+                <button type="submit" class="btn btn-primary" id="createBtn">创建</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.account-card {
+    background: white;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 12px;
+    transition: box-shadow 0.2s;
+}
+
+.account-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.account-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.account-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.account-info {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    font-size: 14px;
+}
+
+.account-info-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.account-info-label {
+    color: #666;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.account-info-value {
+    color: #333;
+    font-weight: 500;
+}
+
+@media (max-width: 768px) {
+    .account-info {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Language switcher */
+.lang-btn-nav {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #666;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.lang-btn-nav:hover {
+    background: #f5f5f5;
+}
+
+.lang-btn-nav.active {
+    background: #667eea;
+    color: white;
+    border-color: #667eea;
+}
+</style>
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+let currentMode = 'SIM';
+
+// Market type translations
+function translateMarketType(type) {
+    const translations = {
+        'zh-hans': {
+            'US_STOCK': '美股',
+            'HK_STOCK': '港股',
+            'CN_A': 'A股',
+            'CRYPTO': '加密货币'
+        },
+        'en': {
+            'US_STOCK': 'US Stocks',
+            'HK_STOCK': 'HK Stocks',
+            'CN_A': 'CN Stocks',
+            'CRYPTO': 'Cryptocurrency'
+        }
+    };
+    return translations[getCurrentLanguage()][type] || type;
+}
+
+// Apply translations to page elements
+function applyTranslations() {
+    const lang = getCurrentLanguage();
+    
+    // Helper function to safely update element
+    function updateElement(id, text) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+    
+    // Page title
+    updateElement('page-title', lang === 'zh-hans' ? '账户管理 - 投资项目披露平台' : 'Account Management - Stocks Lab');
+    
+    // Navigation
+    updateElement('nav-home', lang === 'zh-hans' ? '首页' : 'Home');
+    updateElement('nav-settings', lang === 'zh-hans' ? '用户设置' : 'Settings');
+    updateElement('nav-manage', lang === 'zh-hans' ? '管理账户' : 'Manage Accounts');
+    
+    // Mode switcher
+    updateElement('mode-label', lang === 'zh-hans' ? '账户模式：' : 'Account Mode:');
+    updateElement('mode-sim', t('simulation'));
+    updateElement('mode-real', t('real'));
+    
+    // Main card
+    updateElement('accounts-title', t('market_accounts'));
+    updateElement('btn-new-account', lang === 'zh-hans' ? '新增市场账户' : 'New Account');
+    updateElement('loading-text', t('loading'));
+    
+    // Modal
+    updateElement('modal-title', lang === 'zh-hans' ? '新增市场账户' : 'Create New Account');
+    updateElement('label-market-type', t('market_type'));
+    updateElement('option-select', lang === 'zh-hans' ? '-- 请选择 --' : '-- Select --');
+    updateElement('option-us', lang === 'zh-hans' ? '美国股票' : 'US Stocks');
+    updateElement('option-cn', lang === 'zh-hans' ? '大陆A股' : 'China A-Shares');
+    updateElement('option-hk', lang === 'zh-hans' ? '香港港股' : 'Hong Kong Stocks');
+    updateElement('option-crypto', lang === 'zh-hans' ? '加密货币' : 'Cryptocurrency');
+    
+    updateElement('label-name', lang === 'zh-hans' ? '账户名称（可选）' : 'Account Name (Optional)');
+    updateElement('name-hint', lang === 'zh-hans' ? '例如：我的美股账户' : 'e.g.: My US Stock Account');
+    updateElement('label-currency', t('currency'));
+    updateElement('currency-select', lang === 'zh-hans' ? '-- 请选择 --' : '-- Select --');
+    updateElement('label-start-cash', t('start_cash'));
+    
+    updateElement('btn-cancel', t('cancel'));
+    updateElement('createBtn', lang === 'zh-hans' ? '创建' : 'Create');
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const lang = getCurrentLanguage();
+    document.getElementById('lang-' + (lang === 'zh-hans' ? 'zh' : 'en')).classList.add('active');
+    applyTranslations();
+    
+    // Check URL for mode parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlMode = urlParams.get('mode');
+    if (urlMode && (urlMode === 'SIM' || urlMode === 'REAL')) {
+        currentMode = urlMode;
+    }
+    
+    // Load accounts
+    switchMode(currentMode);
+});
+
+// Load accounts
+async function loadAccounts(mode) {
+    try {
+        console.log('Loading accounts for mode:', mode);
+        const response = await API.get(`/accounts/?mode=${mode}`);
+        const accounts = response.results || response;
+        console.log('Loaded accounts:', accounts.length, accounts);
+        renderAccounts(accounts);
+    } catch (error) {
+        console.error('Failed to load accounts:', error);
+        const lang = getCurrentLanguage();
+        showError((lang === 'zh-hans' ? '加载失败：' : 'Failed to load: ') + (error.message || ''));
+        document.getElementById('accountsList').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">⚠️</div>
+                <div>${lang === 'zh-hans' ? '加载失败' : 'Load Failed'}</div>
+                <button class="btn btn-primary" onclick="loadAccounts('${mode}')">${lang === 'zh-hans' ? '重试' : 'Retry'}</button>
+            </div>
+        `;
+    }
+}
+
+// Render accounts
+function renderAccounts(accounts) {
+    const container = document.getElementById('accountsList');
+    const lang = getCurrentLanguage();
+    
+    if (!accounts || accounts.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <div>${t('no_data')}</div>
+                <button class="btn btn-primary" onclick="showCreateModal()">${lang === 'zh-hans' ? '新增市场账户' : 'New Account'}</button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = accounts.map(account => `
+        <div class="account-card">
+            <div class="account-header">
+                <div class="account-name">${account.name || translateMarketType(account.market_type)}</div>
+                <span class="badge badge-primary">${account.mode === 'SIM' ? t('simulation') : t('real')}</span>
+            </div>
+            <div class="account-info">
+                <div class="account-info-item">
+                    <span class="account-info-label">${t('market_type')}</span>
+                    <span class="account-info-value">${translateMarketType(account.market_type)}</span>
+                </div>
+                <div class="account-info-item">
+                    <span class="account-info-label">${t('currency')}</span>
+                    <span class="account-info-value">${account.currency_display || account.currency}</span>
+                </div>
+                <div class="account-info-item">
+                    <span class="account-info-label">${t('start_cash')}</span>
+                    <span class="account-info-value">${formatNumber(account.start_cash)} ${account.currency}</span>
+                </div>
+                <div class="account-info-item">
+                    <span class="account-info-label">${t('current_balance')}</span>
+                    <span class="account-info-value">${formatNumber(account.current_cash)} ${account.currency}</span>
+                </div>
+            </div>
+            <div style="margin-top: 12px;">
+                <button class="btn btn-primary btn-sm" onclick="enterAccount(${account.id})">${t('enter_account')}</button>
+                <span style="margin-left: 10px; font-size: 12px; color: #666;">
+                    ${t('trade_count')}: ${account.trade_count} ${t('trades_count')}
+                </span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Switch mode
+function switchMode(mode) {
+    currentMode = mode;
+    
+    // Update button styles
+    document.getElementById('simModeBtn').className = mode === 'SIM' ? 'btn btn-primary btn-sm' : 'btn btn-sm';
+    document.getElementById('realModeBtn').className = mode === 'REAL' ? 'btn btn-primary btn-sm' : 'btn btn-sm';
+    
+    // Reload accounts
+    loadAccounts(mode);
+}
+
+// Show create modal
+function showCreateModal() {
+    document.getElementById('createModal').style.display = 'block';
+    document.body.style.overflow = 'hidden';
+}
+
+// Hide create modal
+function hideCreateModal() {
+    document.getElementById('createModal').style.display = 'none';
+    document.body.style.overflow = '';
+    document.getElementById('createForm').reset();
+}
+
+// Handle market type change
+function handleMarketTypeChange() {
+    const marketType = document.getElementById('market_type').value;
+    const currencySelect = document.getElementById('currency');
+    
+    const currencyMap = {
+        'US_STOCK': 'USD',
+        'CN_A': 'CNY',
+        'HK_STOCK': 'HKD',
+        'CRYPTO': 'USDT'
+    };
+    
+    if (marketType && currencyMap[marketType]) {
+        currencySelect.value = currencyMap[marketType];
+    }
+}
+
+// Handle create
+async function handleCreate(event) {
+    event.preventDefault();
+    
+    const createBtn = document.getElementById('createBtn');
+    const lang = getCurrentLanguage();
+    createBtn.disabled = true;
+    createBtn.textContent = lang === 'zh-hans' ? '创建中...' : 'Creating...';
+    
+    try {
+        const formData = {
+            mode: currentMode,
+            market_type: document.getElementById('market_type').value,
+            name: document.getElementById('name').value || undefined,
+            currency: document.getElementById('currency').value,
+            start_cash: parseFloat(document.getElementById('start_cash').value)
+        };
+        
+        console.log('Creating account:', formData);
+        const account = await API.post('/accounts/', formData);
+        console.log('Created account:', account);
+        
+        showSuccess(lang === 'zh-hans' ? '账户创建成功！' : 'Account created successfully!');
+        hideCreateModal();
+        loadAccounts(currentMode);
+        
+    } catch (error) {
+        console.error('Failed to create account:', error);
+        showError((lang === 'zh-hans' ? '创建失败：' : 'Failed to create: ') + (error.message || ''));
+    } finally {
+        createBtn.disabled = false;
+        createBtn.textContent = lang === 'zh-hans' ? '创建' : 'Create';
+    }
+}
+
+// Enter account
+function enterAccount(accountId) {
+    window.location.href = `/accounts/${accountId}/`;
+}
+</script>
+{% endblock %}

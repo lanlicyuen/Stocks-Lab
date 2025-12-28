@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+
+{% block page_title %}仪表盘{% endblock %}
+
+{% block content %}
+{% if not projects %}
+<div class="card">
+    <div class="alert alert-info">
+        您还没有加入任何项目。请联系管理员添加您到项目中。
+    </div>
+</div>
+{% else %}
+
+<!-- 项目选择 -->
+<div class="card">
+    <div class="card-title">项目</div>
+    <select id="project-selector" class="form-group select" onchange="location.href='?project='+this.value">
+        {% for project in projects %}
+        <option value="{{ project.id }}" {% if selected_project and selected_project.id == project.id %}selected{% endif %}>
+            {{ project.name }}
+        </option>
+        {% endfor %}
+    </select>
+</div>
+
+{% if selected_project %}
+<!-- 统计卡片 -->
+<div class="stats-grid">
+    <div class="stat-box">
+        <div class="stat-label">最新结余</div>
+        <div class="stat-value">
+            {% if latest_balance %}
+            ¥{{ latest_balance.balance|floatformat:2 }}
+            {% else %}
+            -
+            {% endif %}
+        </div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">更新日期</div>
+        <div class="stat-value" style="font-size: 14px;">
+            {% if latest_balance %}
+            {{ latest_balance.date }}
+            {% else %}
+            -
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- 最近交易 -->
+<div class="card">
+    <div class="card-title">最近交易</div>
+    {% if recent_trades %}
+    {% for trade in recent_trades %}
+    <div class="list-item">
+        <div class="list-item-title">
+            {{ trade.symbol }}
+            <span class="badge {% if trade.side == 'BUY' %}badge-success{% else %}badge-danger{% endif %}">
+                {{ trade.get_side_display }}
+            </span>
+        </div>
+        <div class="list-item-meta">
+            {{ trade.quantity }} 股 @ ¥{{ trade.price }} | {{ trade.executed_at|date:"Y-m-d H:i" }}
+        </div>
+    </div>
+    {% endfor %}
+    <a href="{% url 'trades' selected_project.id %}" class="btn btn-primary btn-block">查看全部交易</a>
+    {% else %}
+    <div class="alert alert-info">暂无交易记录</div>
+    {% endif %}
+</div>
+
+<!-- 快捷操作 -->
+<div class="card">
+    <div class="card-title">快捷操作</div>
+    <a href="{% url 'balances' selected_project.id %}" class="btn btn-success btn-block">📊 日结余</a>
+    <a href="{% url 'trades' selected_project.id %}" class="btn btn-primary btn-block">💰 交易记录</a>
+    <a href="{% url 'contributions' selected_project.id %}" class="btn btn-info btn-block">💵 出资记录</a>
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

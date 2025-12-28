@@ -1,0 +1,226 @@
+{% extends 'base_new.html' %}
+
+{% block title %}新增市场账户 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="{% url 'dashboard' %}">账户列表</a>
+    <a href="#" id="projectLink">项目详情</a>
+    <a href="#" class="active">新增账户</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <button onclick="window.history.back()" class="btn btn-secondary btn-sm" style="padding: 5px 10px;">
+                ← 返回
+            </button>
+            <h2 class="card-title" style="margin: 0;">新增市场账户</h2>
+        </div>
+    </div>
+    <div class="card-body">
+        <form id="accountForm" onsubmit="handleSubmit(event)" style="max-width: 600px;">
+            <!-- 账户名称 -->
+            <div class="form-group">
+                <label for="name" class="required">账户名称</label>
+                <input type="text" id="name" name="name" class="form-control" 
+                       placeholder="例如：美国股票账户" required>
+                <small class="form-text">给账户起一个便于识别的名称</small>
+            </div>
+
+            <!-- 市场类型 -->
+            <div class="form-group">
+                <label for="market_type" class="required">市场类型</label>
+                <select id="market_type" name="market_type" class="form-control" required onchange="handleMarketTypeChange()">
+                    <option value="">-- 请选择市场类型 --</option>
+                    <option value="US_STOCK">美国股票</option>
+                    <option value="CN_A">大陆A股</option>
+                    <option value="HK_STOCK">香港港股</option>
+                    <option value="CRYPTO">加密货币</option>
+                </select>
+            </div>
+
+            <!-- 币种 -->
+            <div class="form-group">
+                <label for="currency" class="required">币种</label>
+                <select id="currency" name="currency" class="form-control" required>
+                    <option value="">-- 请选择币种 --</option>
+                    <option value="USD">美元 (USD)</option>
+                    <option value="CNY">人民币 (CNY)</option>
+                    <option value="HKD">港币 (HKD)</option>
+                    <option value="USDT">USDT</option>
+                </select>
+                <small class="form-text">系统会根据市场类型自动推荐默认币种</small>
+            </div>
+
+            <!-- 起始资金 -->
+            <div class="form-group">
+                <label for="start_cash" class="required">起始资金</label>
+                <input type="number" id="start_cash" name="start_cash" class="form-control" 
+                       placeholder="0.00" step="0.01" min="0" required>
+                <small class="form-text">账户初始投入的资金金额</small>
+            </div>
+
+            <!-- 提交按钮 -->
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()">
+                    取消
+                </button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">
+                    创建账户
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-control:disabled {
+    background-color: #f5f5f5;
+    cursor: not-allowed;
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+
+.form-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid #eee;
+}
+
+@media (max-width: 768px) {
+    .form-actions {
+        flex-direction: column-reverse;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+let projectId = null;
+
+// Get projectId from URL
+function getProjectIdFromUrl() {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get('project');
+}
+
+// Handle market type change
+function handleMarketTypeChange() {
+    const marketType = document.getElementById('market_type').value;
+    const currencySelect = document.getElementById('currency');
+    
+    // Map market type to default currency
+    const currencyMap = {
+        'US_STOCK': 'USD',
+        'CN_A': 'CNY',
+        'HK_STOCK': 'HKD',
+        'CRYPTO': 'USDT'
+    };
+    
+    if (marketType && currencyMap[marketType]) {
+        currencySelect.value = currencyMap[marketType];
+    }
+}
+
+// Handle form submission
+async function handleSubmit(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '创建中...';
+    
+    try {
+        const formData = {
+            project: parseInt(projectId),
+            name: document.getElementById('name').value,
+            market_type: document.getElementById('market_type').value,
+            currency: document.getElementById('currency').value,
+            start_cash: parseFloat(document.getElementById('start_cash').value)
+        };
+        
+        const account = await API.post('/market-accounts/', formData);
+        
+        showSuccess('市场账户创建成功！');
+        
+        // Redirect to project dashboard
+        setTimeout(() => {
+            window.location.href = `/projects/${projectId}/dashboard/`;
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Failed to create account:', error);
+        showError(error.message || '创建失败，请重试');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '创建账户';
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    projectId = getProjectIdFromUrl();
+    
+    if (!projectId) {
+        showError('缺少项目ID参数');
+        setTimeout(() => window.history.back(), 2000);
+        return;
+    }
+    
+    // Update project link
+    document.getElementById('projectLink').href = `/projects/${projectId}/dashboard/`;
+    
+    // Load project name
+    API.get(`/projects/${projectId}/`).then(project => {
+        document.getElementById('projectLink').textContent = project.name;
+    }).catch(error => {
+        console.error('Failed to load project:', error);
+    });
+});
+</script>
+{% endblock %}

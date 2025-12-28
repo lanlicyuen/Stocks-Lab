@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}投资项目披露平台{% endblock %}</title>
+    <script src="/static/js/i18n.js"></script>
+    {% block extra_head %}{% endblock %}
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --warning-color: #f39c12;
+            --dark-color: #2c3e50;
+            --light-bg: #ecf0f1;
+            --card-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            --border-radius: 8px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--light-bg);
+            color: #333;
+            padding-bottom: 70px;
+            line-height: 1.6;
+        }
+        
+        /* Header */
+        .header {
+            background: var(--dark-color);
+            color: white;
+            padding: 12px 15px;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header h1 {
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .user-badge {
+            background: rgba(255,255,255,0.15);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .user-badge:hover {
+            background: rgba(255,255,255,0.25);
+        }
+        
+        .role-admin { background: var(--danger-color); }
+        .role-viewer { background: var(--primary-color); }
+        
+        /* User Dropdown */
+        .user-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            min-width: 180px;
+            display: none;
+            z-index: 2000;
+        }
+        
+        .user-dropdown.show {
+            display: block;
+        }
+        
+        .user-dropdown a {
+            display: block;
+            padding: 12px 16px;
+            color: #333;
+            text-decoration: none;
+            border-bottom: 1px solid #eee;
+            transition: background 0.2s;
+        }
+        
+        .user-dropdown a:last-child {
+            border-bottom: none;
+        }
+        
+        .user-dropdown a:hover {
+            background: #f5f5f5;
+        }
+        
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+        }
+        
+        /* Card */
+        .card {
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+            margin-bottom: 15px;
+            overflow: hidden;
+        }
+        
+        .card-header {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        .card-body {
+            padding: 15px;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            text-decoration: none;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-success {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        .btn-danger {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .btn:active {
+            transform: scale(0.98);
+        }
+        
+        .btn-block {
+            display: block;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        /* Form */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #555;
+        }
+        
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+        }
+        
+        textarea.form-control {
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
+        
+        /* Mobile Card List */
+        .mobile-card {
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: var(--card-shadow);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .mobile-card:active {
+            transform: scale(0.98);
+        }
+        
+        .mobile-card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+        
+        .mobile-card-label {
+            font-size: 12px;
+            color: #888;
+        }
+        
+        .mobile-card-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        .mobile-card-primary {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--dark-color);
+            margin-bottom: 8px;
+        }
+        
+        /* Bottom Tab Navigation */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 6px;
+            z-index: 999;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .nav-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            color: #888;
+            font-size: 11px;
+            padding: 4px;
+            transition: color 0.2s;
+        }
+        
+        .nav-item.active {
+            color: var(--primary-color);
+        }
+        
+        .nav-icon {
+            font-size: 20px;
+            margin-bottom: 2px;
+        }
+        
+        /* Table (Desktop) */
+        .table-responsive {
+            overflow-x: auto;
+            display: none;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        table th, table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        table td {
+            font-size: 14px;
+        }
+        
+        /* Badge */
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-primary {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+        
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 30px;
+            color: #999;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Alert */
+        .alert {
+            padding: 12px 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+        
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .alert-danger {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        /* FAB (Floating Action Button) */
+        .fab {
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s;
+            z-index: 900;
+        }
+        
+        .fab:active {
+            transform: scale(0.9);
+        }
+        
+        /* Desktop Styles */
+        @media (min-width: 768px) {
+            body {
+                padding-bottom: 0;
+            }
+            
+            .header h1 {
+                font-size: 20px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            .card {
+                margin-bottom: 20px;
+            }
+            
+            /* Keep mobile-card visible on desktop for operation records */
+            /* Removed: .mobile-card { display: none; } */
+            
+            .table-responsive {
+                display: block;
+            }
+            
+            .bottom-nav {
+                display: none;
+            }
+            
+            .fab {
+                bottom: 30px;
+            }
+            
+            /* Desktop Navigation */
+            .desktop-nav {
+                background: white;
+                border-radius: var(--border-radius);
+                padding: 10px;
+                margin-bottom: 20px;
+                display: flex;
+                gap: 10px;
+                box-shadow: var(--card-shadow);
+            }
+            
+            .desktop-nav a {
+                padding: 10px 20px;
+                border-radius: 6px;
+                text-decoration: none;
+                color: #555;
+                font-size: 14px;
+                font-weight: 500;
+                transition: all 0.2s;
+            }
+            
+            .desktop-nav a:hover {
+                background: var(--light-bg);
+            }
+            
+            .desktop-nav a.active {
+                background: var(--primary-color);
+                color: white;
+            }
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            height: 250px;
+            margin: 15px 0;
+        }
+        
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--card-shadow);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--dark-color);
+        }
+        
+        @media (min-width: 768px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+            
+            .chart-container {
+                height: 300px;
+            }
+        }
+    </style>
+    {% block extra_style %}{% endblock %}
+</head>
+<body>
+    {% if user.is_authenticated %}
+    <div class="header">
+        <div class="header-content">
+            <h1>📊 <span id="site-title">投资披露平台</span></h1>
+            <div class="user-badge {% if user_role == 'ADMIN' %}role-admin{% else %}role-viewer{% endif %}" onclick="toggleUserDropdown()">
+                <span>{{ user.username }}</span>
+                {% if user_role %}
+                <span>({{ user_role }})</span>
+                {% endif %}
+                <span style="margin-left:4px;">▼</span>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="/account">⚙️ <span id="account-settings">账号管理</span></a>
+                    <a href="#" onclick="logout(event)">🚪 <span id="logout-menu">登出</span></a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <div class="container">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">
+                {{ message }}
+            </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    
+    {% if user.is_authenticated %}
+    <!-- Mobile Bottom Navigation -->
+    <nav class="bottom-nav">
+        <a href="{% url 'dashboard' %}" class="nav-item {% if request.path == '/' or 'accounts' in request.path %}active{% endif %}">
+            <div class="nav-icon">💼</div>
+            <div>账户</div>
+        </a>
+        <a href="{% url 'account_settings' %}" class="nav-item {% if request.path == '/account' %}active{% endif %}">
+            <div class="nav-icon">⚙️</div>
+            <div>设置</div>
+        </a>
+        <a href="{% url 'logout' %}" class="nav-item">
+            <div class="nav-icon">🚪</div>
+            <div>退出</div>
+        </a>
+    </nav>
+    {% endif %}
+    
+    <script>
+        // Global API helper
+        const API = {
+            baseURL: '/api/v1',
+            
+            async request(url, options = {}) {
+                const response = await fetch(this.baseURL + url, {
+                    ...options,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': this.getCookie('csrftoken'),
+                        ...options.headers
+                    },
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.status}`);
+                }
+                
+                // 204 No Content 不返回 body
+                if (response.status === 204) {
+                    return null;
+                }
+                
+                return response.json();
+            },
+            
+            get(url) {
+                return this.request(url);
+            },
+            
+            post(url, data) {
+                return this.request(url, {
+                    method: 'POST',
+                    body: JSON.stringify(data)
+                });
+            },
+            
+            put(url, data) {
+                return this.request(url, {
+                    method: 'PUT',
+                    body: JSON.stringify(data)
+                });
+            },
+            
+            patch(url, data) {
+                return this.request(url, {
+                    method: 'PATCH',
+                    body: JSON.stringify(data)
+                });
+            },
+            
+            delete(url) {
+                return this.request(url, { method: 'DELETE' });
+            },
+            
+            async upload(url, formData) {
+                const response = await fetch(this.baseURL + url, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': this.getCookie('csrftoken')
+                    },
+                    body: formData,
+                    credentials: 'include'
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Upload Error: ${response.status}`);
+                }
+                
+                return response.json();
+            },
+            
+            getCookie(name) {
+                let cookieValue = null;
+                if (document.cookie && document.cookie !== '') {
+                    const cookies = document.cookie.split(';');
+                    for (let i = 0; i < cookies.length; i++) {
+                        const cookie = cookies[i].trim();
+                        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                            cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                            break;
+                        }
+                    }
+                }
+                return cookieValue;
+            }
+        };
+        
+        // Format helpers
+        function formatNumber(num) {
+            return new Intl.NumberFormat('zh-CN').format(num);
+        }
+        
+        function formatCurrency(num, currency = 'CNY') {
+            const symbols = {
+                'CNY': '¥',
+                'USD': '$',
+                'HKD': 'HK$',
+                'USDT': '$'
+            };
+            const symbol = symbols[currency] || '¥';
+            return symbol + formatNumber(parseFloat(num).toFixed(2));
+        }
+        
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('zh-CN');
+        }
+        
+        function formatDateTime(dateStr) {
+            const date = new Date(dateStr);
+            return date.toLocaleString('zh-CN');
+        }
+        
+        // Get current project from localStorage
+        function getCurrentProject() {
+            return localStorage.getItem('currentProject');
+        }
+        
+        // Set current project to localStorage
+        function setCurrentProject(projectId) {
+            localStorage.setItem('currentProject', projectId);
+        }
+        
+        // Project selector (for mobile)
+        function showProjectSelector() {
+            window.location.href = '/projects/';
+        }
+        
+        // Show success message
+        function showSuccess(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-success';
+            alert.textContent = message;
+            const container = document.querySelector('.container') || document.body;
+            if (container.firstChild) {
+                container.insertBefore(alert, container.firstChild);
+            } else {
+                container.appendChild(alert);
+            }
+            setTimeout(() => alert.remove(), 3000);
+        }
+        
+        // Show error message
+        function showError(message) {
+            const alert = document.createElement('div');
+            alert.className = 'alert alert-danger';
+            alert.textContent = message;
+            const container = document.querySelector('.container') || document.body;
+            if (container.firstChild) {
+                container.insertBefore(alert, container.firstChild);
+            } else {
+                container.appendChild(alert);
+            }
+            setTimeout(() => alert.remove(), 5000);
+        }
+        
+        // Show info message
+        function showInfo(message) {
+            alert(message);
+        }
+        
+        // Toggle user dropdown
+        function toggleUserDropdown() {
+            const dropdown = document.getElementById('userDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('show');
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const userBadge = document.querySelector('.user-badge');
+            const dropdown = document.getElementById('userDropdown');
+            if (dropdown && userBadge && !userBadge.contains(e.target)) {
+                dropdown.classList.remove('show');
+            }
+        });
+        
+        // Logout function
+        async function logout(event) {
+            if (event) event.preventDefault();
+            
+            try {
+                const response = await fetch('/api/v1/auth/logout/', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'X-CSRFToken': API.getCsrfToken()
+                    }
+                });
+                
+                if (response.ok) {
+                    localStorage.clear();
+                    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                } else {
+                    throw new Error('登出失败');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                localStorage.clear();
+                window.location.href = '/login';
+            }
+        }
+        
+        // Check login status on page load
+        async function checkLoginStatus() {
+            try {
+                const response = await fetch('/api/v1/me/', {
+                    credentials: 'include'
+                });
+                
+                if (response.status === 401) {
+                    window.location.href = '/login?next=' + encodeURIComponent(window.location.pathname);
+                }
+            } catch (error) {
+                console.error('Login check error:', error);
+            }
+        }
+        
+        // Run login check on authenticated pages
+        {% if user.is_authenticated %}
+        document.addEventListener('DOMContentLoaded', checkLoginStatus);
+        {% endif %}
+        
+        // Apply translations to base elements
+        function applyBaseTranslations() {
+            const elements = {
+                'site-title': 'site_title',
+                'account-settings': 'account_settings',
+                'logout-menu': 'logout_menu'
+            };
+            
+            for (const [id, key] of Object.entries(elements)) {
+                const el = document.getElementById(id);
+                if (el) el.textContent = t(key);
+            }
+        }
+        
+        // Apply translations when page loads
+        document.addEventListener('DOMContentLoaded', applyBaseTranslations);
+    </script>
+    
+    {% block extra_script %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,517 @@
+{% extends 'base_new.html' %}
+
+{% block title %}新增交易 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span id="nav-home">首页</span></a>
+    <a href="{% url 'accounts_list' %}"><span id="nav-account-list">账户列表</span></a>
+    <a href="{% url 'account_detail' account_id %}"><span id="nav-account-detail">账户详情</span></a>
+    <a href="#" class="active"><span id="nav-add-trade">新增交易</span></a>
+</div>
+
+<!-- 账户资金信息 -->
+<div class="card" style="margin-bottom: 15px;">
+    <div class="card-body" style="padding: 15px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+            <div>
+                <div style="font-size: 12px; color: #666;">起始资金</div>
+                <div style="font-size: 18px; font-weight: bold; color: #333;" id="startCash">加载中...</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #666;">当前现金</div>
+                <div style="font-size: 18px; font-weight: bold; color: #2ecc71;" id="currentCash">加载中...</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #666;">持仓价值</div>
+                <div style="font-size: 18px; font-weight: bold; color: #3498db;" id="positionValue">¥0</div>
+            </div>
+            <div>
+                <div style="font-size: 12px; color: #666;">可用资金</div>
+                <div style="font-size: 18px; font-weight: bold; color: #f39c12;" id="availableCash">加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" id="page-title">新增交易记录</h2>
+    </div>
+    <div class="card-body">
+        <form id="tradeForm">
+            <div class="form-group">
+                <label for="security"><span id="label-select-security">选择标的</span> *</label>
+                <select id="security" name="security" class="form-control" required>
+                    <option value="" id="opt-loading">加载中...</option>
+                </select>
+                <small class="form-text">
+                    <span id="text-no-security">没有找到标的？</span>
+                    <a href="{% url 'security_form' account_id %}" style="color: #007bff;"><span id="link-add-security">点击新增</span></a>
+                </small>
+            </div>
+
+            <div class="form-group">
+                <label for="action"><span id="label-action">交易动作</span> *</label>
+                <select id="action" name="action" class="form-control" required>
+                    <option value="" id="opt-select">请选择...</option>
+                    <option value="OPEN_LONG" id="opt-open-long">开多（买入做多）</option>
+                    <option value="CLOSE_LONG" id="opt-close-long">平多（卖出平多）</option>
+                    <option value="OPEN_SHORT" id="opt-open-short">开空（卖出做空）</option>
+                    <option value="CLOSE_SHORT" id="opt-close-short">平空（买入平空）</option>
+                </select>
+                <small class="form-text" id="actionHint"></small>
+            </div>
+
+            <div class="form-row" style="display: flex; gap: 15px;">
+                <div class="form-group" style="flex: 1;">
+                    <label for="quantity"><span id="label-quantity">数量</span> *</label>
+                    <input type="number" id="quantity" name="quantity" class="form-control" 
+                           step="0.0001" min="0.0001" placeholder="" required>
+                </div>
+
+                <div class="form-group" style="flex: 1;">
+                    <label for="price"><span id="label-price">价格</span> *</label>
+                    <input type="number" id="price" name="price" class="form-control" 
+                           step="0.0001" min="0.0001" placeholder="" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="fee"><span id="label-fee">手续费</span></label>
+                <input type="number" id="fee" name="fee" class="form-control" 
+                       step="0.01" min="0" value="0" placeholder="">
+            </div>
+
+            <div class="form-group">
+                <label for="traded_at"><span id="label-trade-time">交易时间</span> *</label>
+                <input type="datetime-local" id="traded_at" name="traded_at" class="form-control" required>
+            </div>
+
+            <div class="form-group">
+                <label for="notes"><span id="label-notes">交易理由（支持 Markdown）</span></label>
+                <textarea id="notes" name="notes" class="form-control" rows="5" 
+                          placeholder=""></textarea>
+                <small class="form-text" id="hint-markdown">支持 Markdown 语法，可以添加链接、列表等</small>
+            </div>
+
+            <div class="summary-box" id="summaryBox" style="display: none;">
+                <h4 id="title-preview">交易预览</h4>
+                <div class="summary-item">
+                    <span>交易金额：</span>
+                    <span id="totalAmount">-</span>
+                </div>
+                <div class="summary-item">
+                    <span>现金影响：</span>
+                    <span id="cashImpact" style="font-weight: 600;">-</span>
+                </div>
+                <div class="summary-item">
+                    <span>说明：</span>
+                    <span id="impactDesc" style="font-size: 13px; color: #666;">-</span>
+                </div>
+                <div id="buyingPowerWarning" style="margin-top: 10px;"></div>
+            </div>
+
+            <div class="form-actions" style="display: flex; gap: 10px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary">
+                    <span id="submitText">提交交易</span>
+                    <span id="submitLoading" style="display: none;">处理中...</span>
+                </button>
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()"><span id="btn-cancel">取消</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 12px;
+}
+
+textarea.form-control {
+    resize: vertical;
+    font-family: monospace;
+}
+
+.summary-box {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 20px 0;
+}
+
+.summary-box h4 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #333;
+}
+
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.summary-item:last-child {
+    border-bottom: none;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: #545b62;
+}
+</style>
+
+<script>
+const accountId = {{ account_id }};
+
+let securities = [];
+let accountSummary = null;
+let accountCurrency = 'CNY';  // 默认人民币
+
+// 格式化货币
+function formatCurrency(value) {
+    const symbols = {
+        'CNY': '¥',
+        'USD': '$',
+        'HKD': 'HK$',
+        'USDT': '$'
+    };
+    const symbol = symbols[accountCurrency] || '¥';
+    return symbol + parseFloat(value).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// 加载账户资金信息
+async function loadAccountSummary() {
+    try {
+        const response = await fetch(`/api/v1/accounts/${accountId}/summary/`, {
+            credentials: 'include'
+        });
+        const data = await response.json();
+        accountSummary = data;  // 整个响应就是账户信息
+        
+        // 保存账户货币类型用于格式化
+        accountCurrency = accountSummary.currency;
+        
+        document.getElementById('startCash').textContent = formatCurrency(accountSummary.start_cash);
+        document.getElementById('currentCash').textContent = formatCurrency(accountSummary.current_cash);
+        document.getElementById('availableCash').textContent = formatCurrency(accountSummary.current_cash);
+        
+        // 持仓价值暂时设为0（需要实时市价才能计算）
+        document.getElementById('positionValue').textContent = '¥0';
+        
+    } catch (error) {
+        console.error('Failed to load account summary:', error);
+        document.getElementById('startCash').textContent = '加载失败';
+        document.getElementById('currentCash').textContent = '加载失败';
+        document.getElementById('availableCash').textContent = '加载失败';
+    }
+}
+
+// 加载标的列表
+async function loadSecurities() {
+    try {
+        const response = await fetch(`/api/v1/securities/?account=${accountId}`, {
+            credentials: 'include'
+        });
+        
+        const data = await response.json();
+        securities = data.results || data;
+        
+        const select = document.getElementById('security');
+        select.innerHTML = '<option value="">请选择标的...</option>';
+        
+        if (securities.length === 0) {
+            select.innerHTML += '<option value="" disabled>暂无标的，请先创建</option>';
+        } else {
+            securities.forEach(sec => {
+                const option = document.createElement('option');
+                option.value = sec.id;
+                option.textContent = `${sec.symbol} - ${sec.name}`;
+                select.appendChild(option);
+            });
+        }
+    } catch (error) {
+        console.error('Error loading securities:', error);
+        alert('加载标的列表失败');
+    }
+}
+
+// 设置默认交易时间为当前时间
+function setDefaultTime() {
+    const now = new Date();
+    const offset = now.getTimezoneOffset() * 60000;
+    const localTime = new Date(now - offset).toISOString().slice(0, 16);
+    document.getElementById('traded_at').value = localTime;
+}
+
+// 更新交易预览
+function updateSummary() {
+    const action = document.getElementById('action').value;
+    const quantity = parseFloat(document.getElementById('quantity').value) || 0;
+    const price = parseFloat(document.getElementById('price').value) || 0;
+    const fee = parseFloat(document.getElementById('fee').value) || 0;
+    
+    if (!action || quantity <= 0 || price <= 0) {
+        document.getElementById('summaryBox').style.display = 'none';
+        return;
+    }
+    
+    const amount = quantity * price;
+    let cashImpact, impactDesc, cashColor;
+    
+    switch(action) {
+        case 'OPEN_LONG':
+            cashImpact = -(amount + fee);
+            impactDesc = '支出金额（买入成本 + 手续费）';
+            cashColor = '#dc3545';
+            break;
+        case 'CLOSE_LONG':
+            cashImpact = amount - fee;
+            impactDesc = '收入金额（卖出收入 - 手续费）';
+            cashColor = '#28a745';
+            break;
+        case 'OPEN_SHORT':
+            cashImpact = amount - fee;
+            impactDesc = '收入金额（卖空收入 - 手续费）';
+            cashColor = '#28a745';
+            break;
+        case 'CLOSE_SHORT':
+            cashImpact = -(amount + fee);
+            impactDesc = '支出金额（买入平空 + 手续费）';
+            cashColor = '#dc3545';
+            break;
+    }
+    
+    document.getElementById('summaryBox').style.display = 'block';
+    document.getElementById('totalAmount').textContent = `$${amount.toFixed(2)}`;
+    document.getElementById('cashImpact').textContent = `$${cashImpact.toFixed(2)}`;
+    document.getElementById('cashImpact').style.color = cashColor;
+    document.getElementById('impactDesc').textContent = impactDesc;
+    
+    // 检查购买力
+    const warningDiv = document.getElementById('buyingPowerWarning');
+    warningDiv.innerHTML = '';
+    
+    if (accountSummary && (action === 'OPEN_LONG' || action === 'CLOSE_SHORT')) {
+        const requiredCash = amount + fee;
+        const availableCash = accountSummary.current_cash;
+        
+        if (requiredCash > availableCash) {
+            warningDiv.innerHTML = `
+                <div style="color: #dc3545; font-weight: bold; padding: 10px; background: #fee; border-radius: 6px; border: 1px solid #fcc;">
+                    ⚠️ 资金不足！需要 ${formatCurrency(requiredCash)}，可用 ${formatCurrency(availableCash)}
+                </div>
+            `;
+            document.querySelector('button[type="submit"]').disabled = true;
+        } else {
+            const afterCash = availableCash + cashImpact;
+            const feePerShare = quantity > 0 ? fee / quantity : 0;
+            const maxQty = Math.floor(availableCash / (price + feePerShare));
+            warningDiv.innerHTML = `
+                <div style="color: #666; font-size: 13px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+                    ✅ 交易后余额：${formatCurrency(afterCash)} | 最大可买：${maxQty} 股
+                </div>
+            `;
+            document.querySelector('button[type="submit"]').disabled = false;
+        }
+    } else if (accountSummary) {
+        const afterCash = accountSummary.current_cash + cashImpact;
+        warningDiv.innerHTML = `
+            <div style="color: #666; font-size: 13px; padding: 8px; background: #f8f9fa; border-radius: 6px;">
+                交易后余额：${formatCurrency(afterCash)}
+            </div>
+        `;
+        document.querySelector('button[type="submit"]').disabled = false;
+    }
+}
+
+// 动作提示
+document.getElementById('action').addEventListener('change', function() {
+    const hints = {
+        'OPEN_LONG': '开多：买入并持有，期待价格上涨',
+        'CLOSE_LONG': '平多：卖出现有多头持仓',
+        'OPEN_SHORT': '开空：借入并卖出，期待价格下跌',
+        'CLOSE_SHORT': '平空：买入以关闭空头持仓'
+    };
+    
+    document.getElementById('actionHint').textContent = hints[this.value] || '';
+    updateSummary();
+});
+
+// 监听数量、价格、手续费变化
+['quantity', 'price', 'fee'].forEach(id => {
+    document.getElementById(id).addEventListener('input', updateSummary);
+});
+
+// 表单提交
+document.getElementById('tradeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const submitText = document.getElementById('submitText');
+    const submitLoading = document.getElementById('submitLoading');
+    
+    submitBtn.disabled = true;
+    submitText.style.display = 'none';
+    submitLoading.style.display = 'inline';
+    
+    try {
+        const formData = {
+            account: accountId,
+            security: parseInt(document.getElementById('security').value),
+            action: document.getElementById('action').value,
+            quantity: document.getElementById('quantity').value,
+            price: document.getElementById('price').value,
+            fee: document.getElementById('fee').value || '0',
+            traded_at: new Date(document.getElementById('traded_at').value).toISOString(),
+            notes: document.getElementById('notes').value || ''
+        };
+        
+        const response = await fetch('/api/v1/trades/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': API.getCookie('csrftoken')
+            },
+            credentials: 'include',
+            body: JSON.stringify(formData)
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+            alert('交易创建成功！');
+            window.location.href = `/accounts/${accountId}/`;
+        } else {
+            let errorMsg = '创建失败：\n';
+            if (data.quantity) {
+                errorMsg += data.quantity[0] || data.quantity;
+            } else {
+                errorMsg += JSON.stringify(data, null, 2);
+            }
+            alert(errorMsg);
+            
+            submitBtn.disabled = false;
+            submitText.style.display = 'inline';
+            submitLoading.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('网络错误，请稍后重试');
+        
+        submitBtn.disabled = false;
+        submitText.style.display = 'inline';
+        submitLoading.style.display = 'none';
+    }
+});
+
+// 初始化
+loadAccountSummary();
+loadSecurities();
+setDefaultTime();
+
+// Apply translations
+document.addEventListener('DOMContentLoaded', function() {
+    const translations = {
+        'nav-home': 'home',
+        'nav-account-list': 'account_list',
+        'nav-account-detail': 'account_detail',
+        'nav-add-trade': 'add_trade',
+        'label-start-cash': 'start_cash',
+        'loading-start': 'loading',
+        'label-current-cash': 'current_cash',
+        'loading-current': 'loading',
+        'label-position-value': 'position_value',
+        'label-available-cash': 'available_cash',
+        'loading-available': 'loading',
+        'page-title': 'add_trade_title',
+        'label-select-security': 'select_security',
+        'opt-loading': 'loading',
+        'text-no-security': 'no_security_add',
+        'link-add-security': 'click_to_add',
+        'label-action': 'action_label',
+        'opt-select': 'select_placeholder',
+        'opt-open-long': 'open_long_desc',
+        'opt-close-long': 'close_long_desc',
+        'opt-open-short': 'open_short_desc',
+        'opt-close-short': 'close_short_desc',
+        'label-quantity': 'quantity_label',
+        'label-price': 'price_label',
+        'label-fee': 'fee_label',
+        'label-trade-time': 'trade_time_label',
+        'label-notes': 'trade_reason',
+        'hint-markdown': 'markdown_hint',
+        'title-preview': 'trade_preview',
+        'submitText': 'submit_trade',
+        'submitLoading': 'processing',
+        'btn-cancel': 'cancel'
+    };
+    
+    for (const [id, key] of Object.entries(translations)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    }
+    
+    // Update placeholders
+    document.getElementById('quantity').placeholder = t('quantity_placeholder');
+    document.getElementById('price').placeholder = t('price_placeholder');
+    document.getElementById('fee').placeholder = t('fee_placeholder');
+    document.getElementById('notes').placeholder = t('reason_placeholder');
+});
+</script>
+
+{% endblock %}

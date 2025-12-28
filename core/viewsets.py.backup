@@ -1,0 +1,467 @@
+from rest_framework import viewsets, status, decorators
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django_filters.rest_framework import DjangoFilterBackend
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from datetime import datetime
+import json
+
+from .models import (
+    Project, ProjectMember, Contribution,
+    DailyBalance, Trade, Attachment, AuditLog, Security,
+    MarketAccount, CashAdjustment
+)
+from .serializers import (
+    ProjectSerializer, ProjectMemberSerializer, ContributionSerializer,
+    DailyBalanceSerializer, TradeSerializer, AttachmentSerializer,
+    AuditLogSerializer, UserSerializer, BalanceSummarySerializer, SecuritySerializer,
+    MarketAccountSerializer, CashAdjustmentSerializer
+)
+from .permissions import ProjectPermission, AttachmentPermission
+
+
+def create_audit_log(action, model_type, model_id, user, changes=None):
+    """创建审计日志"""
+    AuditLog.objects.create(
+        action=action,
+        model_type=model_type,
+        model_id=model_id,
+        user=user,
+        changes=json.dumps(changes, ensure_ascii=False) if changes else ''
+    )
+
+
+class ProjectViewSet(viewsets.ModelViewSet):
+    """项目视图集"""
+    serializer_class = ProjectSerializer
+    permission_classes = [IsAuthenticated, ProjectPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['name']
+    
+    def get_queryset(self):
+        # 只返回用户可见的项目
+        user = self.request.user
+        if user.is_superuser:
+            return Project.objects.all()
+        return Project.objects.filter(members__user=user).distinct()
+    
+    def perform_create(self, serializer):
+        project = serializer.save()
+        create_audit_log('CREATE', 'Project', project.id, self.request.user, {
+            'name': project.name,
+            'description': project.description
+        })
+    
+    def perform_update(self, serializer):
+        project = serializer.save()
+        create_audit_log('UPDATE', 'Project', project.id, self.request.user, {
+            'name': project.name,
+            'description': project.description
+        })
+    
+    def perform_destroy(self, instance):
+        create_audit_log('DELETE', 'Project', instance.id, self.request.user, {
+            'name': instance.name
+        })
+        instance.delete()
+    
+    @decorators.action(detail=True, methods=['get'])
+    def members(self, request, pk=None):
+        """获取项目成员列表"""
+        project = self.get_object()
+        members = project.members.all()
+        serializer = ProjectMemberSerializer(members, many=True)
+        return Response(serializer.data)
+    
+    @decorators.action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_member(self, request, pk=None):
+        """添加项目成员（仅管理员）"""
+        project = self.get_object()
+        
+        # 检查是否是管理员
+        try:
+            membership = ProjectMember.objects.get(project=project, user=request.user)
+            if membership.role != 'ADMIN' and not request.user.is_superuser:
+                return Response({'error': '只有管理员可以添加成员'}, status=status.HTTP_403_FORBIDDEN)
+        except ProjectMember.DoesNotExist:
+            return Response({'error': '您不是该项目成员'}, status=status.HTTP_403_FORBIDDEN)
+        
+        serializer = ProjectMemberSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(project=project)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ContributionViewSet(viewsets.ModelViewSet):
+    """出资记录视图集"""
+    serializer_class = ContributionSerializer
+    permission_classes = [IsAuthenticated, ProjectPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['project', 'user']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Contribution.objects.all()
+        # 只返回用户可见项目的出资记录
+        return Contribution.objects.filter(
+            project__members__user=user
+        ).distinct()
+    
+    def perform_create(self, serializer):
+        contribution = serializer.save(created_by=self.request.user)
+        create_audit_log('CREATE', 'Contribution', contribution.id, self.request.user, {
+            'amount': str(contribution.amount),
+            'user': contribution.user.username
+        })
+
+
+class DailyBalanceViewSet(viewsets.ModelViewSet):
+    """每日结余视图集"""
+    serializer_class = DailyBalanceSerializer
+    permission_classes = [IsAuthenticated, ProjectPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['project', 'date']
+    
+    def get_queryset(self):
+        user = self.request.user
+        queryset = DailyBalance.objects.all()
+        
+        if not user.is_superuser:
+            # 只返回用户可见项目的结余
+            queryset = queryset.filter(project__members__user=user).distinct()
+        
+        # 支持日期范围筛选
+        from_date = self.request.query_params.get('from_date')
+        to_date = self.request.query_params.get('to_date')
+        
+        if from_date:
+            queryset = queryset.filter(date__gte=from_date)
+        if to_date:
+            queryset = queryset.filter(date__lte=to_date)
+        
+        return queryset
+    
+    def perform_create(self, serializer):
+        balance = serializer.save(created_by=self.request.user)
+        create_audit_log('CREATE', 'DailyBalance', balance.id, self.request.user, {
+            'date': str(balance.date),
+            'balance': str(balance.balance)
+        })
+    
+    def perform_update(self, serializer):
+        old_balance = self.get_object().balance
+        balance = serializer.save()
+        create_audit_log('UPDATE', 'DailyBalance', balance.id, self.request.user, {
+            'old_balance': str(old_balance),
+            'new_balance': str(balance.balance)
+        })
+
+
+class BalanceSummaryViewSet(viewsets.ViewSet):
+    """净值曲线汇总视图"""
+    permission_classes = [IsAuthenticated]
+    
+    def list(self, request):
+        """获取指定项目的净值曲线"""
+        project_id = request.query_params.get('project')
+        if not project_id:
+            return Response({'error': '请指定项目ID'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 检查权限
+        try:
+            project = Project.objects.get(id=project_id)
+            if not request.user.is_superuser:
+                ProjectMember.objects.get(project=project, user=request.user)
+        except (Project.DoesNotExist, ProjectMember.DoesNotExist):
+            return Response({'error': '项目不存在或无权访问'}, status=status.HTTP_403_FORBIDDEN)
+        
+        # 获取所有结余记录，按日期排序
+        balances = DailyBalance.objects.filter(project=project).order_by('date')
+        
+        summary_data = []
+        prev_balance = None
+        
+        for balance in balances:
+            if prev_balance is None:
+                delta = 0
+                return_pct = 0
+            else:
+                delta = balance.balance - prev_balance
+                return_pct = (delta / prev_balance * 100) if prev_balance != 0 else 0
+            
+            summary_data.append({
+                'date': balance.date,
+                'balance': balance.balance,
+                'delta': delta,
+                'return_pct': round(return_pct, 4)
+            })
+            prev_balance = balance.balance
+        
+        serializer = BalanceSummarySerializer(summary_data, many=True)
+        return Response(serializer.data)
+
+
+class TradeViewSet(viewsets.ModelViewSet):
+    """交易记录视图集"""
+    serializer_class = TradeSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['account', 'symbol', 'side']
+    
+    def get_queryset(self):
+        # 只返回当前用户账户的交易记录
+        return Trade.objects.filter(account__owner=self.request.user)
+    
+    def perform_create(self, serializer):
+        trade = serializer.save()
+        create_audit_log('CREATE', 'Trade', trade.id, self.request.user, {
+            'account': trade.account.name,
+            'symbol': trade.symbol,
+            'side': trade.side,
+            'quantity': trade.quantity,
+            'price': str(trade.price)
+        })
+    
+    def perform_update(self, serializer):
+        trade = serializer.save()
+        create_audit_log('UPDATE', 'Trade', trade.id, self.request.user, {
+            'symbol': trade.symbol,
+            'side': trade.side
+        })
+
+
+class AttachmentViewSet(viewsets.ModelViewSet):
+    """附件视图集"""
+    serializer_class = AttachmentSerializer
+    permission_classes = [IsAuthenticated, AttachmentPermission]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['owner_type', 'owner_id']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return Attachment.objects.all()
+        
+        # 只返回用户可见项目的附件
+        from django.db.models import Q
+        return Attachment.objects.filter(
+            Q(owner_type='TRADE', owner_id__in=Trade.objects.filter(
+                project__members__user=user
+            ).values_list('id', flat=True)) |
+            Q(owner_type='BALANCE', owner_id__in=DailyBalance.objects.filter(
+                project__members__user=user
+            ).values_list('id', flat=True))
+        ).distinct()
+    
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user)
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """审计日志视图集（只读）"""
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['action', 'model_type', 'model_id']
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_superuser:
+            return AuditLog.objects.all()
+        # 普通用户只能看到自己的操作日志
+        return AuditLog.objects.filter(user=user)
+
+
+class SecurityViewSet(viewsets.ModelViewSet):
+    """证券主档视图集"""
+    serializer_class = SecuritySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['account', 'symbol', 'sector', 'asset_class']
+    
+    def get_queryset(self):
+        # 只返回当前用户账户的证券
+        return Security.objects.filter(account__owner=self.request.user)
+    
+    def perform_create(self, serializer):
+        security = serializer.save()
+        create_audit_log('CREATE', 'Security', security.id, self.request.user, {
+            'symbol': security.symbol,
+            'name': security.name,
+            'sector': security.sector
+        })
+    
+    def perform_update(self, serializer):
+        security = serializer.save()
+        create_audit_log('UPDATE', 'Security', security.id, self.request.user, {
+            'symbol': security.symbol,
+            'name': security.name
+        })
+    
+    @decorators.action(detail=False, methods=['get'], url_path='check-symbol')
+    def check_symbol(self, request):
+        """检查股票代码是否已存在"""
+        symbol = request.query_params.get('symbol', '').upper()
+        account_id = request.query_params.get('account')
+        
+        if not symbol or not account_id:
+            return Response({'error': '缺少参数'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        security = Security.objects.filter(
+            account_id=account_id,
+            symbol=symbol
+        ).first()
+        
+        if security:
+            return Response({
+                'exists': True,
+                'security': SecuritySerializer(security).data
+            })
+        else:
+            return Response({'exists': False})
+
+
+class MarketAccountViewSet(viewsets.ModelViewSet):
+    """市场账户视图集"""
+    serializer_class = MarketAccountSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['mode', 'market_type']
+    
+    def get_queryset(self):
+        # 只返回当前用户的账户
+        return MarketAccount.objects.filter(owner=self.request.user)
+    
+    def perform_create(self, serializer):
+        account = serializer.save(owner=self.request.user)
+        create_audit_log('CREATE', 'MarketAccount', account.id, self.request.user, {
+            'name': account.name,
+            'mode': account.mode,
+            'market_type': account.market_type,
+            'start_cash': str(account.start_cash)
+        })
+    
+    def perform_update(self, serializer):
+        account = serializer.save()
+        create_audit_log('UPDATE', 'MarketAccount', account.id, self.request.user, {
+            'name': account.name
+        })
+    
+    def perform_destroy(self, instance):
+        """删除前检查是否有关联交易"""
+        if instance.trades.exists():
+            from rest_framework.exceptions import ValidationError
+            raise ValidationError('该账户下还有交易记录，无法删除')
+        
+        create_audit_log('DELETE', 'MarketAccount', instance.id, self.request.user, {
+            'name': instance.name
+        })
+        instance.delete()
+    
+    @decorators.action(detail=True, methods=['get'], url_path='summary')
+    def account_summary(self, request, pk=None):
+        """获取账户汇总信息"""
+        account = self.get_object()
+        serializer = MarketAccountSerializer(account, context={'request': request})
+        
+        # 额外返回详细的交易记录
+        from django.db.models import Sum
+        trades = account.trades.all()
+        
+        buy_trades = trades.filter(side='BUY')
+        sell_trades = trades.filter(side='SELL')
+        
+        buy_count = buy_trades.count()
+        sell_count = sell_trades.count()
+        
+        buy_total = sum(float(t.quantity) * float(t.price) + float(t.fee) for t in buy_trades)
+        sell_total = sum(float(t.quantity) * float(t.price) - float(t.fee) for t in sell_trades)
+        
+        total_fee = sum(float(t.fee) for t in trades)
+        
+        # 资金调整汇总
+        adjustments = account.adjustments.aggregate(total=Sum('amount'))['total'] or 0
+        
+        return Response({
+            **serializer.data,
+            'trade_stats': {
+                'buy_count': buy_count,
+                'sell_count': sell_count,
+                'total_count': buy_count + sell_count,
+                'buy_total': round(buy_total, 2),
+                'sell_total': round(sell_total, 2),
+                'total_fee': round(total_fee, 2)
+            },
+            'adjustment_stats': {
+                'total': float(adjustments),
+                'count': account.adjustments.count()
+            }
+        })
+    
+    @decorators.action(detail=True, methods=['get'], url_path='adjustments')
+    def adjustments(self, request, pk=None):
+        """获取账户的资金调整记录"""
+        account = self.get_object()
+        adjustments = account.adjustments.all()
+        serializer = CashAdjustmentSerializer(adjustments, many=True, context={'request': request})
+        return Response(serializer.data)
+    
+    @decorators.action(detail=True, methods=['post'], url_path='add-adjustment')
+    def add_adjustment(self, request, pk=None):
+        """添加资金调整记录"""
+        account = self.get_object()
+        
+        serializer = CashAdjustmentSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            adjustment = serializer.save(account=account)
+            create_audit_log('CREATE', 'CashAdjustment', adjustment.id, request.user, {
+                'account': account.name,
+                'amount': str(adjustment.amount),
+                'date': str(adjustment.date)
+            })
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @decorators.action(detail=True, methods=['get'], url_path='trades')
+    def trades(self, request, pk=None):
+        """获取账户的交易记录"""
+        account = self.get_object()
+        trades = account.trades.all().order_by('-executed_at')
+        serializer = TradeSerializer(trades, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class CashAdjustmentViewSet(viewsets.ModelViewSet):
+    """资金调整视图集"""
+    serializer_class = CashAdjustmentSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['account', 'date']
+    
+    def get_queryset(self):
+        # 只返回当前用户账户的调整记录
+        return CashAdjustment.objects.filter(account__owner=self.request.user)
+    
+    def perform_create(self, serializer):
+        adjustment = serializer.save()
+        create_audit_log('CREATE', 'CashAdjustment', adjustment.id, self.request.user, {
+            'account': adjustment.account.name,
+            'amount': str(adjustment.amount),
+            'date': str(adjustment.date)
+        })
+    
+    def perform_update(self, serializer):
+        adjustment = serializer.save()
+        create_audit_log('UPDATE', 'CashAdjustment', adjustment.id, self.request.user, {
+            'amount': str(adjustment.amount)
+        })
+    
+    def perform_destroy(self, instance):
+        create_audit_log('DELETE', 'CashAdjustment', instance.id, self.request.user, {
+            'account': instance.account.name,
+            'amount': str(instance.amount)
+        })
+        instance.delete()

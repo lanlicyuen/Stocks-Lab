@@ -1,0 +1,421 @@
+{% extends 'base_new.html' %}
+
+{% block title %}新建交易 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="javascript:history.back()">返回项目</a>
+    <a href="#">新建交易</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">新建交易记录</h2>
+        <span id="projectBadge" class="badge badge-primary" style="display: none;"></span>
+    </div>
+    <div class="card-body">
+        <form id="tradeForm">
+            <!-- 账户选择 -->
+            <div class="form-group" id="accountSelectGroup">
+                <label>市场账户 <span style="color: red;">*</span></label>
+                <select id="account" class="form-control" required>
+                    <option value="">加载中...</option>
+                </select>
+                <small class="form-text">选择交易账户，不同市场账户资金独立计算</small>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>标的代码 <span style="color: red;">*</span></label>
+                    <input type="text" id="symbol" class="form-control" required placeholder="如：AAPL" style="text-transform: uppercase;">
+                    <small class="form-text">自动转换为大写</small>
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label>交易方向 <span style="color: red;">*</span></label>
+                    <select id="side" class="form-control" required>
+                        <option value="">请选择</option>
+                        <option value="BUY">买入</option>
+                        <option value="SELL">卖出</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- 证券信息区块 -->
+            <div id="securityInfo" class="alert alert-info" style="display: none; margin-bottom: 15px;">
+                <strong>标的信息：</strong>
+                <div style="margin-top: 8px;">
+                    <div><strong>资产类别：</strong><span id="securityAssetClass">-</span></div>
+                    <div><strong>公司/资产名称：</strong><span id="securityName">-</span></div>
+                    <div id="securitySectorRow" style="display: none;"><strong>行业分类：</strong><span id="securitySector">-</span></div>
+                    <div id="securityExchangeRow" style="display: none;"><strong>交易所：</strong><span id="securityExchange">-</span></div>
+                </div>
+            </div>
+            
+            <!-- 补充信息区块（股票代码不存在时显示） -->
+            <div id="newSecurityForm" style="display: none; padding: 15px; background: #f8f9fa; border-radius: 8px; margin-bottom: 15px;">
+                <h4 style="margin-top: 0; color: #856404;">📝 首次交易此标的，请补充信息</h4>
+                
+                <div class="form-group">
+                    <label>资产类别 <span style="color: red;">*</span></label>
+                    <select id="securityAssetClassInput" class="form-control" required>
+                        <option value="">请选择</option>
+                        <option value="US_STOCK">美股</option>
+                        <option value="HK_STOCK">港股</option>
+                        <option value="CRYPTO">加密货币</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>公司/资产全名 <span style="color: red;">*</span></label>
+                    <input type="text" id="securityNameInput" class="form-control" placeholder="例如：Apple Inc. 或 Bitcoin">
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 1;">
+                        <label>行业分类（可选）</label>
+                        <input type="text" id="securitySectorInput" class="form-control" placeholder="例如：科技">
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>交易所（可选）</label>
+                        <select id="securityExchangeInput" class="form-control">
+                            <option value="">请选择</option>
+                            <option value="NASDAQ">NASDAQ</option>
+                            <option value="NYSE">NYSE</option>
+                            <option value="HKEX">HKEX</option>
+                            <option value="BINANCE">Binance</option>
+                            <option value="COINBASE">Coinbase</option>
+                            <option value="OTHER">其他</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group" style="flex: 1;">
+                    <label>价格 <span style="color: red;">*</span></label>
+                    <input type="number" id="price" class="form-control" step="0.01" required placeholder="成交价格" min="0">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label>数量 <span style="color: red;">*</span></label>
+                    <input type="number" id="quantity" class="form-control" step="1" required placeholder="交易数量" min="1">
+                </div>
+                
+                <div class="form-group" style="flex: 1;">
+                    <label>手续费</label>
+                    <input type="number" id="fee" class="form-control" step="0.01" placeholder="0.00" min="0" value="0">
+                    <small class="form-text">交易手续费（可选）</small>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>交易日期 <span style="color: red;">*</span></label>
+                <input type="datetime-local" id="executedAt" class="form-control" required>
+            </div>
+            
+            <div class="form-group">
+                <label>交易逻辑 <span style="color: red;">*</span></label>
+                <textarea id="thesis" class="form-control" rows="8" required placeholder="请详细说明交易逻辑，支持 Markdown 格式"></textarea>
+                <small class="form-text">支持 Markdown 格式，如 **粗体**、*斜体*、[链接](url)、列表等</small>
+            </div>
+            
+            <div class="form-group">
+                <label>附件上传</label>
+                <input type="file" id="attachments" class="form-control" multiple accept="image/*,.pdf">
+                <small class="form-text">支持多张图片或PDF，单个文件不超过10MB</small>
+            </div>
+            
+            <div id="attachmentPreview" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+            
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="window.history.back()">取消</button>
+                <button type="submit" class="btn btn-primary" id="submitBtn">提交</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+let currentProjectId = null;
+let currentSecurity = null;
+let accounts = [];
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    // Set default datetime to now
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    document.getElementById('executedAt').value = now.toISOString().slice(0, 16);
+    
+    // Get projectId and display project info
+    const urlParams = new URLSearchParams(window.location.search);
+    currentProjectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!currentProjectId) {
+        showError('未选择项目，请返回首页选择');
+        document.getElementById('submitBtn').disabled = true;
+        return;
+    }
+    
+    // Load and display project info
+    try {
+        const project = await API.get(`/projects/${currentProjectId}/`);
+        document.getElementById('projectBadge').textContent = `项目: ${project.name}`;
+        document.getElementById('projectBadge').style.display = 'inline-block';
+        
+        // Load market accounts
+        await loadAccounts();
+    } catch (error) {
+        console.error('Failed to load project:', error);
+    }
+});
+
+// Load market accounts
+async function loadAccounts() {
+    try {
+        const response = await API.get(`/market-accounts/?project=${currentProjectId}`);
+        accounts = response.results || response;
+        
+        const accountSelect = document.getElementById('account');
+        
+        if (accounts.length === 0) {
+            accountSelect.innerHTML = '<option value="">此项目暂无市场账户，请先创建</option>';
+            accountSelect.disabled = true;
+            document.getElementById('submitBtn').disabled = true;
+            showError('此项目暂无市场账户，请先在项目页面创建市场账户');
+            return;
+        }
+        
+        // 如果只有一个账户，自动选中并隐藏选择器
+        if (accounts.length === 1) {
+            accountSelect.innerHTML = `<option value="${accounts[0].id}" selected>${accounts[0].name} (${accounts[0].market_type_display})</option>`;
+            document.getElementById('accountSelectGroup').style.display = 'none';
+        } else {
+            // 多个账户，显示选择器
+            accountSelect.innerHTML = '<option value="">请选择市场账户</option>' +
+                accounts.map(acc => 
+                    `<option value="${acc.id}">${acc.name} (${acc.market_type_display} - ${acc.currency})</option>`
+                ).join('');
+        }
+    } catch (error) {
+        console.error('Failed to load accounts:', error);
+        showError('加载账户失败');
+    }
+}
+
+// Check symbol when input changes (with debounce)
+let symbolCheckTimeout;
+document.getElementById('symbol').addEventListener('input', function(e) {
+    clearTimeout(symbolCheckTimeout);
+    const symbol = e.target.value.trim().toUpperCase();
+    
+    if (symbol.length < 1) {
+        hideSecurityInfo();
+        return;
+    }
+    
+    symbolCheckTimeout = setTimeout(() => {
+        checkSecurity(symbol);
+    }, 500);
+});
+
+async function checkSecurity(symbol) {
+    if (!currentProjectId) return;
+    
+    try {
+        const response = await API.get(`/securities/check-symbol/?project=${currentProjectId}&symbol=${symbol}`);
+        
+        if (response.exists) {
+            // Security exists, show info
+            currentSecurity = response.security;
+            showExistingSecurity(response.security);
+        } else {
+            // Security not exists, show form to create
+            currentSecurity = null;
+            showNewSecurityForm();
+        }
+    } catch (error) {
+        console.error('Failed to check security:', error);
+    }
+}
+
+function showExistingSecurity(security) {
+    document.getElementById('securityInfo').style.display = 'block';
+    document.getElementById('newSecurityForm').style.display = 'none';
+    
+    // 显示资产类别
+    document.getElementById('securityAssetClass').textContent = security.asset_class_display || security.asset_class;
+    
+    // 显示公司/资产名称
+    document.getElementById('securityName').textContent = security.name;
+    
+    // 显示行业分类（如有）
+    if (security.sector) {
+        document.getElementById('securitySectorRow').style.display = 'block';
+        document.getElementById('securitySector').textContent = security.sector;
+    } else {
+        document.getElementById('securitySectorRow').style.display = 'none';
+    }
+    
+    // 显示交易所（如有）
+    if (security.exchange) {
+        document.getElementById('securityExchangeRow').style.display = 'block';
+        document.getElementById('securityExchange').textContent = security.exchange_display || security.exchange;
+    } else {
+        document.getElementById('securityExchangeRow').style.display = 'none';
+    }
+}
+
+function showNewSecurityForm() {
+    document.getElementById('securityInfo').style.display = 'none';
+    document.getElementById('newSecurityForm').style.display = 'block';
+}
+
+function hideSecurityInfo() {
+    document.getElementById('securityInfo').style.display = 'none';
+    document.getElementById('newSecurityForm').style.display = 'none';
+    currentSecurity = null;
+}
+
+// Preview attachments
+document.getElementById('attachments').addEventListener('change', function(e) {
+    const preview = document.getElementById('attachmentPreview');
+    preview.innerHTML = '';
+    
+    Array.from(e.target.files).forEach(file => {
+        if (file.size > 10 * 1024 * 1024) {
+            showError(`文件 ${file.name} 超过10MB限制`);
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.style.width = '100px';
+            img.style.height = '100px';
+            img.style.objectFit = 'cover';
+            img.style.borderRadius = '4px';
+            img.style.border = '1px solid #ddd';
+            preview.appendChild(img);
+        };
+        
+        if (file.type.startsWith('image/')) {
+            reader.readAsDataURL(file);
+        } else {
+            const div = document.createElement('div');
+            div.textContent = file.name;
+            div.style.padding = '10px';
+            div.style.border = '1px solid #ddd';
+            div.style.borderRadius = '4px';
+            preview.appendChild(div);
+        }
+    });
+});
+
+// Form submission
+document.getElementById('tradeForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+    
+    if (!currentProjectId) {
+        showError('请先选择项目');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+        return;
+    }
+    
+    const symbol = document.getElementById('symbol').value.trim().toUpperCase();
+    const side = document.getElementById('side').value;
+    const price = document.getElementById('price').value;
+    const quantity = document.getElementById('quantity').value;
+    const fee = document.getElementById('fee').value || '0';
+    const executedAt = document.getElementById('executedAt').value;
+    const thesis = document.getElementById('thesis').value.trim();
+    const account = document.getElementById('account').value;
+    
+    if (!account) {
+        showError('请选择市场账户');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+        return;
+    }
+    
+    if (!symbol || !side || !price || !quantity || !executedAt || !thesis) {
+        showError('请填写所有必填项');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+        return;
+    }
+    
+    // Prepare trade data
+    const tradeData = {
+        project: currentProjectId,
+        account: parseInt(account),
+        symbol: symbol,
+        side: side,
+        price: parseFloat(price),
+        quantity: parseInt(quantity),
+        fee: parseFloat(fee),
+        executed_at: executedAt,
+        thesis: thesis
+    };
+    
+    // If security not exists, include security info
+    if (!currentSecurity) {
+        const securityAssetClass = document.getElementById('securityAssetClassInput').value.trim();
+        const securityName = document.getElementById('securityNameInput').value.trim();
+        const securitySector = document.getElementById('securitySectorInput').value.trim();
+        const securityExchange = document.getElementById('securityExchangeInput').value.trim();
+        
+        if (!securityAssetClass || !securityName) {
+            showError('请填写标的的资产类别和名称');
+            submitBtn.disabled = false;
+            submitBtn.textContent = '提交';
+            return;
+        }
+        
+        tradeData.security_asset_class = securityAssetClass;
+        tradeData.security_name = securityName;
+        tradeData.security_sector = securitySector;
+        tradeData.security_exchange = securityExchange;
+    }
+    
+    try {
+        // Create trade record
+        const trade = await API.post('/trades/', tradeData);
+        
+        // Upload attachments if any
+        const files = document.getElementById('attachments').files;
+        if (files.length > 0) {
+            for (let file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('owner_type', 'TRADE');
+                formData.append('owner_id', trade.id);
+                
+                await API.upload('/attachments/', formData);
+            }
+        }
+        
+        showSuccess('交易记录创建成功！');
+        setTimeout(() => {
+            window.location.href = `/projects/${currentProjectId}/dashboard/`;
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Create trade failed:', error);
+        showError('创建失败：' + (error.message || '未知错误'));
+        submitBtn.disabled = false;
+        submitBtn.textContent = '提交';
+    }
+});
+</script>
+{% endblock %}

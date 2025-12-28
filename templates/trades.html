@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+
+{% block page_title %}交易记录 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">{{ project.name }} - 交易记录</div>
+    
+    {% if my_role == 'ADMIN' %}
+    <button class="btn btn-success btn-block" onclick="showAddForm()">+ 新增交易</button>
+    
+    <div id="add-form" style="display:none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+        <h3 style="margin-bottom: 10px;">新增交易</h3>
+        <form method="post" action="/api/v1/trades/" id="trade-form">
+            {% csrf_token %}
+            <input type="hidden" name="project" value="{{ project.id }}">
+            
+            <div class="form-group">
+                <label>股票代码 *</label>
+                <input type="text" name="symbol" required placeholder="例如: 600519">
+            </div>
+            
+            <div class="form-group">
+                <label>交易方向 *</label>
+                <select name="side" required>
+                    <option value="BUY">买入</option>
+                    <option value="SELL">卖出</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>数量 *</label>
+                <input type="number" name="quantity" required placeholder="股数">
+            </div>
+            
+            <div class="form-group">
+                <label>价格 *</label>
+                <input type="number" name="price" step="0.0001" required placeholder="元">
+            </div>
+            
+            <div class="form-group">
+                <label>执行时间 *</label>
+                <input type="datetime-local" name="executed_at" required>
+            </div>
+            
+            <div class="form-group">
+                <label>交易理论依据（支持 Markdown）*</label>
+                <textarea name="thesis" required placeholder="请输入交易理由和分析"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>复盘（可选）</label>
+                <textarea name="review" placeholder="交易后的复盘总结"></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-success">保存</button>
+            <button type="button" class="btn" onclick="hideAddForm()">取消</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title">交易列表</div>
+    {% if trades %}
+    {% for trade in trades %}
+    <div class="list-item">
+        <div class="list-item-title">
+            {{ trade.symbol }}
+            <span class="badge {% if trade.side == 'BUY' %}badge-success{% else %}badge-danger{% endif %}">
+                {{ trade.get_side_display }}
+            </span>
+        </div>
+        <div style="margin: 5px 0;">
+            <strong>{{ trade.quantity }} 股 @ ¥{{ trade.price }}</strong>
+            <span style="margin-left: 10px; color: #666;">总额: ¥{{ trade.total_amount|floatformat:2 }}</span>
+        </div>
+        <div class="list-item-meta">
+            {{ trade.executed_at|date:"Y-m-d H:i" }} | 记录人: {{ trade.created_by.username }}
+        </div>
+        {% if trade.thesis %}
+        <details style="margin-top: 10px; font-size: 13px;">
+            <summary style="cursor: pointer; color: #3498db;">查看交易依据</summary>
+            <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                {{ trade.thesis|linebreaks }}
+            </div>
+        </details>
+        {% endif %}
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info">暂无交易记录</div>
+    {% endif %}
+</div>
+
+<script>
+function showAddForm() {
+    document.getElementById('add-form').style.display = 'block';
+    // 设置默认时间为当前时间
+    const now = new Date();
+    const dateTimeLocal = now.getFullYear() + '-' + 
+        String(now.getMonth() + 1).padStart(2, '0') + '-' + 
+        String(now.getDate()).padStart(2, '0') + 'T' + 
+        String(now.getHours()).padStart(2, '0') + ':' + 
+        String(now.getMinutes()).padStart(2, '0');
+    document.querySelector('input[name="executed_at"]').value = dateTimeLocal;
+}
+
+function hideAddForm() {
+    document.getElementById('add-form').style.display = 'none';
+}
+
+document.getElementById('trade-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        project: parseInt(formData.get('project')),
+        symbol: formData.get('symbol'),
+        side: formData.get('side'),
+        quantity: parseInt(formData.get('quantity')),
+        price: parseFloat(formData.get('price')),
+        executed_at: formData.get('executed_at'),
+        thesis: formData.get('thesis'),
+        review: formData.get('review')
+    };
+    
+    try {
+        const response = await fetch('/api/v1/trades/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('添加成功！');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert('添加失败: ' + JSON.stringify(error));
+        }
+    } catch (error) {
+        alert('添加失败: ' + error);
+    }
+});
+</script>
+{% endblock %}

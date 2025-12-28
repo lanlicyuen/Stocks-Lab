@@ -1,0 +1,136 @@
+{% extends 'base_new.html' %}
+
+{% block title %}账号管理 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="{% url 'dashboard' %}">账户管理</a>
+    <a href="/account" class="active">账号管理</a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">账号信息</h2>
+    </div>
+    <div class="card-body">
+        <div id="accountInfo">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">修改密码</h2>
+    </div>
+    <div class="card-body">
+        <form id="changePasswordForm" onsubmit="changePassword(event)">
+            <div class="form-group">
+                <label>当前密码</label>
+                <input type="password" id="oldPassword" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>新密码</label>
+                <input type="password" id="newPassword" class="form-control" required minlength="8">
+            </div>
+            <div class="form-group">
+                <label>确认新密码</label>
+                <input type="password" id="confirmPassword" class="form-control" required minlength="8">
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">修改密码</button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+async function loadAccountInfo() {
+    try {
+        const user = await API.get('/me/');
+        renderAccountInfo(user);
+    } catch (error) {
+        console.error('Failed to load account info:', error);
+        showError('加载失败，请刷新重试');
+    }
+}
+
+function renderAccountInfo(user) {
+    const container = document.getElementById('accountInfo');
+    
+    const roleMap = {
+        'SUPERUSER': '超级管理员',
+        'ADMIN': '管理员',
+        'VIEWER': '观察者'
+    };
+    
+    container.innerHTML = `
+        <div class="mobile-card-row">
+            <span class="mobile-card-label">用户名</span>
+            <span class="mobile-card-value"><strong>${user.username}</strong></span>
+        </div>
+        <div class="mobile-card-row">
+            <span class="mobile-card-label">邮箱</span>
+            <span class="mobile-card-value">${user.email || '-'}</span>
+        </div>
+        <div class="mobile-card-row">
+            <span class="mobile-card-label">最高角色</span>
+            <span class="badge ${user.highest_role === 'ADMIN' || user.highest_role === 'SUPERUSER' ? 'badge-danger' : 'badge-primary'}">
+                ${roleMap[user.highest_role] || user.highest_role || '-'}
+            </span>
+        </div>
+        <div class="mobile-card-row">
+            <span class="mobile-card-label">加入时间</span>
+            <span class="mobile-card-value">${formatDateTime(user.date_joined)}</span>
+        </div>
+        <div class="mobile-card-row">
+            <span class="mobile-card-label">最后登录</span>
+            <span class="mobile-card-value">${user.last_login ? formatDateTime(user.last_login) : '-'}</span>
+        </div>
+    `;
+}
+
+async function changePassword(event) {
+    event.preventDefault();
+    
+    const oldPassword = document.getElementById('oldPassword').value;
+    const newPassword = document.getElementById('newPassword').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    if (newPassword !== confirmPassword) {
+        showError('两次输入的新密码不一致');
+        return;
+    }
+    
+    if (newPassword.length < 8) {
+        showError('新密码长度至少为 8 位');
+        return;
+    }
+    
+    try {
+        // Note: This endpoint needs to be implemented in backend
+        showInfo('密码修改功能待实现，请联系管理员');
+        
+        // When implemented:
+        // await API.post('/auth/change-password/', {
+        //     old_password: oldPassword,
+        //     new_password: newPassword
+        // });
+        // showSuccess('密码修改成功，请重新登录');
+        // setTimeout(() => logout(), 2000);
+    } catch (error) {
+        showError('修改失败：' + error.message);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadAccountInfo();
+});
+</script>
+{% endblock %}

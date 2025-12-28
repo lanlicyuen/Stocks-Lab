@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+
+{% block page_title %}403 - 无权访问{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="color: #e74c3c;">403 - 无权访问</h2>
+    <p>抱歉，您没有权限访问此资源。</p>
+    <a href="{% url 'dashboard' %}" class="btn btn-primary">返回首页</a>
+</div>
+{% endblock %}

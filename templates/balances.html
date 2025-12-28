@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+
+{% block page_title %}日结余 - {{ project.name }}{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">{{ project.name }} - 日结余</div>
+    
+    {% if my_role == 'ADMIN' %}
+    <button class="btn btn-success btn-block" onclick="showAddForm()">+ 新增日结余</button>
+    
+    <div id="add-form" style="display:none; margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 5px;">
+        <h3 style="margin-bottom: 10px;">新增日结余</h3>
+        <form method="post" action="/api/v1/balances/" id="balance-form">
+            {% csrf_token %}
+            <input type="hidden" name="project" value="{{ project.id }}">
+            
+            <div class="form-group">
+                <label>日期</label>
+                <input type="date" name="date" required value="{% now 'Y-m-d' %}">
+            </div>
+            
+            <div class="form-group">
+                <label>账户余额（元）</label>
+                <input type="number" name="balance" step="0.01" required placeholder="请输入账户余额">
+            </div>
+            
+            <div class="form-group">
+                <label>备注</label>
+                <textarea name="notes" placeholder="可选"></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-success">保存</button>
+            <button type="button" class="btn" onclick="hideAddForm()">取消</button>
+        </form>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card">
+    <div class="card-title">历史记录</div>
+    {% if balances %}
+    {% for balance in balances %}
+    <div class="list-item">
+        <div class="list-item-title">
+            {{ balance.date }}
+            <span style="float: right; color: #27ae60; font-weight: 700;">
+                ¥{{ balance.balance|floatformat:2 }}
+            </span>
+        </div>
+        {% if balance.notes %}
+        <div class="list-item-meta">{{ balance.notes }}</div>
+        {% endif %}
+        <div class="list-item-meta">
+            记录人: {{ balance.created_by.username }} | {{ balance.created_at|date:"Y-m-d H:i" }}
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info">暂无日结余记录</div>
+    {% endif %}
+</div>
+
+<script>
+function showAddForm() {
+    document.getElementById('add-form').style.display = 'block';
+}
+
+function hideAddForm() {
+    document.getElementById('add-form').style.display = 'none';
+}
+
+document.getElementById('balance-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+        project: parseInt(formData.get('project')),
+        date: formData.get('date'),
+        balance: parseFloat(formData.get('balance')),
+        notes: formData.get('notes')
+    };
+    
+    try {
+        const response = await fetch('/api/v1/balances/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+            },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            alert('添加成功！');
+            location.reload();
+        } else {
+            const error = await response.json();
+            alert('添加失败: ' + JSON.stringify(error));
+        }
+    } catch (error) {
+        alert('添加失败: ' + error);
+    }
+});
+</script>
+{% endblock %}

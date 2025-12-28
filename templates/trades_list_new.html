@@ -1,0 +1,218 @@
+{% extends 'base_new.html' %}
+
+{% block title %}交易记录 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}">首页</a>
+    <a href="javascript:history.back()">返回项目</a>
+    <a href="{% url 'balances' %}">日结余</a>
+    <a href="{% url 'trades' %}" class="active">交易记录</a>
+</div>
+
+<!-- Filter Section -->
+<div class="card">
+    <div class="card-body">
+        <div class="form-row">
+            <div class="form-group" style="flex: 1;">
+                <label>交易方向</label>
+                <select id="sideFilter" class="form-control">
+                    <option value="">全部</option>
+                    <option value="BUY">买入</option>
+                    <option value="SELL">卖出</option>
+                </select>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label>标的代码</label>
+                <input type="text" id="symbolFilter" class="form-control" placeholder="如：AAPL">
+            </div>
+            <div class="form-group" style="flex: 0 0 auto; align-self: flex-end;">
+                <button class="btn btn-primary" onclick="loadTrades()">筛选</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trades List -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">交易记录</h2>
+        {% if user_role == 'ADMIN' %}
+        <button class="btn btn-primary btn-sm" onclick="createTrade()">+ 新建</button>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div id="tradesList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- FAB for mobile -->
+{% if user_role == 'ADMIN' %}
+<button class="fab" onclick="createTrade()" title="新建交易">
+    +
+</button>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_script %}
+<script>
+const userRole = '{{ user_role }}';
+
+async function loadTrades() {
+    // Try to get projectId from URL parameter first, then localStorage
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectId = urlParams.get('project') || getCurrentProject();
+    
+    if (!projectId) {
+        showError('请先选择项目');
+        document.getElementById('tradesList').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📁</div>
+                <div>请先选择项目</div>
+                <a href="/" class="btn btn-primary">返回首页</a>
+            </div>
+        `;
+        return;
+    }
+    
+    const side = document.getElementById('sideFilter').value;
+    const symbol = document.getElementById('symbolFilter').value;
+    
+    let url = `/trades/?project=${projectId}`;
+    if (side) url += `&side=${side}`;
+    if (symbol) url += `&symbol=${symbol}`;
+    
+    try {
+        const trades = await API.get(url);
+        renderTrades(trades);
+    } catch (error) {
+        console.error('Failed to load trades:', error);
+        showError('加载失败，请刷新重试');
+    }
+}
+
+function renderTrades(trades) {
+    const container = document.getElementById('tradesList');
+    
+    if (trades.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📈</div>
+                <div>暂无交易记录</div>
+            </div>
+        `;
+        return;
+    }
+    
+    // Mobile cards
+    container.innerHTML = trades.map(t => {
+        const sideColor = t.side === 'BUY' ? '#28a745' : '#dc3545';
+        const sideName = t.side === 'BUY' ? '买入' : '卖出';
+        
+        return `
+            <div class="mobile-card" onclick="viewTrade(${t.id})">
+                <div class="mobile-card-primary">
+                    <span>${t.symbol}</span>
+                    <span class="badge" style="background-color: ${sideColor};">${sideName}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">价格</span>
+                    <span class="mobile-card-value">${formatCurrency(t.price)}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">数量</span>
+                    <span class="mobile-card-value">${t.quantity}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">成交金额</span>
+                    <span class="mobile-card-value" style="font-weight: bold;">
+                        ${formatCurrency(t.total_amount)}
+                    </span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">交易日期</span>
+                    <span class="mobile-card-value">${formatDate(t.trade_date)}</span>
+                </div>
+            </div>
+        `;
+    }).join('');
+    
+    // Desktop table
+    container.innerHTML += `
+        <div class="table-responsive">
+            <table>
+                <thead>
+                    <tr>
+                        <th>标的代码</th>
+                        <th>交易方向</th>
+                        <th>价格</th>
+                        <th>数量</th>
+                        <th>成交金额</th>
+                        <th>交易日期</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${trades.map(t => {
+                        const sideColor = t.side === 'BUY' ? '#28a745' : '#dc3545';
+                        const sideName = t.side === 'BUY' ? '买入' : '卖出';
+                        
+                        return `
+                            <tr>
+                                <td><strong>${t.symbol}</strong></td>
+                                <td>
+                                    <span class="badge" style="background-color: ${sideColor};">
+                                        ${sideName}
+                                    </span>
+                                </td>
+                                <td>${formatCurrency(t.price)}</td>
+                                <td>${t.quantity}</td>
+                                <td style="font-weight: bold;">${formatCurrency(t.total_amount)}</td>
+                                <td>${formatDate(t.trade_date)}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm" onclick="viewTrade(${t.id})">查看</button>
+                                    ${userRole === 'ADMIN' ? `
+                                    <button class="btn btn-danger btn-sm" onclick="deleteTrade(${t.id})">删除</button>
+                                    ` : ''}
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function createTrade() {
+    window.location.href = '/trades/create/';
+}
+
+function viewTrade(id) {
+    window.location.href = `/trades/${id}/`;
+}
+
+async function deleteTrade(id) {
+    if (!confirm('确定要删除这条交易记录吗？')) return;
+    
+    try {
+        await API.delete(`/trades/${id}/`);
+        showSuccess('删除成功！');
+        loadTrades();
+    } catch (error) {
+        showError('删除失败：' + error.message);
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadTrades();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% block page_title %}项目列表{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-title">我的项目</div>
+    
+    {% if projects %}
+    {% for project in projects %}
+    <div class="list-item">
+        <div class="list-item-title">
+            <a href="{% url 'project_detail' project.id %}" style="color: #2c3e50; text-decoration: none;">
+                {{ project.name }}
+            </a>
+        </div>
+        <div class="list-item-meta">
+            {{ project.description|truncatewords:20 }}
+        </div>
+        <div style="margin-top: 8px;">
+            <a href="{% url 'balances' project.id %}" class="btn btn-sm" style="padding: 5px 10px; font-size: 12px;">日结余</a>
+            <a href="{% url 'trades' project.id %}" class="btn btn-sm" style="padding: 5px 10px; font-size: 12px;">交易</a>
+            <a href="{% url 'contributions' project.id %}" class="btn btn-sm" style="padding: 5px 10px; font-size: 12px;">出资</a>
+        </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="alert alert-info">
+        您还没有加入任何项目。请联系管理员添加您到项目中。
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

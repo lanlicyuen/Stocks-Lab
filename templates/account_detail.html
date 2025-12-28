@@ -1,0 +1,1312 @@
+{% extends 'base_new.html' %}
+
+{% block title %}账户详情 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span id="nav-home">首页</span></a>
+    <a href="/accounts/"><span id="nav-account-list">账户列表</span></a>
+    <a href="#" class="active"><span id="nav-account-detail">账户详情</span></a>
+</div>
+
+<!-- Account Header -->
+<div class="card">
+    <div class="card-header" style="flex-direction: column; align-items: flex-start; gap: 10px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <button onclick="goBack()" class="btn btn-secondary btn-sm" style="padding: 5px 10px;">
+                    ← <span id="btn-back">返回</span>
+                </button>
+                <h2 class="card-title" id="accountName" style="margin: 0;"><span id="text-loading">加载中...</span></h2>
+                <span class="badge badge-primary" id="marketTypeBadge"></span>
+            </div>
+            <div style="display: flex; gap: 10px;" id="actionButtons">
+                <a href="/accounts/{{ account_id }}/securities/new/" class="btn btn-success btn-sm">
+                    + <span id="btn-add-security">新增股票</span>
+                </a>
+                <a href="/accounts/{{ account_id }}/trades/new/" class="btn btn-primary btn-sm">
+                    + <span id="btn-add-trade">新增交易</span>
+                </a>
+                <button class="btn btn-sm" id="addAdjustmentBtn" style="background: #17a2b8; color: white; display: none;" onclick="showAddAdjustmentModal()">
+                    💰 <span id="btn-cash-adjustment">资金调整</span>
+                </button>
+                <button onclick="deleteAccount()" class="btn btn-sm" style="background: #dc3545; color: white;">
+                    🗑️ <span id="btn-delete-account">删除账户</span>
+                </button>
+            </div>
+        </div>
+        <div style="display: flex; gap: 15px; font-size: 14px; color: #666;">
+            <div><span id="label-currency">币种</span>: <span id="currency"></span></div>
+            <div><span id="label-created-at">创建时间</span>: <span id="createdAt"></span></div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Overview -->
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label" id="stat-start-cash">起始资金</div>
+        <div class="stat-value" id="startCash">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label" id="stat-current-cash">当前现金</div>
+        <div class="stat-value" id="currentCash">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label" id="stat-total-pnl">总盈亏</div>
+        <div class="stat-value" id="totalPnL">-</div>
+        <div style="font-size: 14px; margin-top: 5px;" id="returnPct">-</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label" id="stat-trade-count">交易笔数</div>
+        <div class="stat-value" id="tradeCount">-</div>
+    </div>
+</div>
+
+<!-- Trade Stats -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title" id="title-trade-stats">交易统计</h2>
+    </div>
+    <div class="card-body">
+        <div class="stats-grid" id="tradeStats">
+            <div class="stat-card">
+                <div class="stat-label" id="stat-buy-count">买入笔数</div>
+                <div class="stat-value" id="buyCount">-</div>
+                <div style="font-size: 14px; color: #888; margin-top: 5px;" id="buyTotal">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label" id="stat-sell-count">卖出笔数</div>
+                <div class="stat-value" id="sellCount">-</div>
+                <div style="font-size: 14px; color: #888; margin-top: 5px;" id="sellTotal">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label" id="stat-total-fee">手续费</div>
+                <div class="stat-value" id="totalFee">-</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Pending Orders -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">⏳ 待成交订单</h2>
+    </div>
+    <div class="card-body">
+        <div id="pendingOrders">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Current Positions -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📊 当前持仓</h2>
+    </div>
+    <div class="card-body">
+        <div id="positionsList">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Trade Records -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">💹 交易记录</h2>
+        <button id="viewAllTradesBtn" class="btn btn-secondary btn-sm" onclick="toggleAllTrades()">展开全部</button>
+    </div>
+    <div class="card-body">
+        <div id="tradeRecords">
+            <div class="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Operation Records -->
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📋 操作记录</h2>
+        <button id="viewAllOpsBtn" class="btn btn-secondary btn-sm" onclick="toggleAllOperations()" style="display: none;">展开全部</button>
+    </div>
+    <div class="card-body">
+        <div id="operationRecords">
+            <div class="empty-state">
+                <div class="empty-icon">📋</div>
+                <div>点击下方按钮查看操作记录</div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="viewOperationRecords()">
+                        📊 查看操作记录
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Close Position Modal -->
+<div id="closePositionModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3>平仓操作</h3>
+            <button class="close-btn" onclick="closeClosePositionModal()">&times;</button>
+        </div>
+        <form id="closePositionForm" onsubmit="handleClosePosition(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label>标的</label>
+                    <input type="text" id="close_security_name" class="form-control" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>持仓类型</label>
+                    <input type="text" id="close_position_type_display" class="form-control" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>持仓数量</label>
+                    <input type="text" id="close_current_quantity" class="form-control" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>平均成本</label>
+                    <input type="text" id="close_avg_cost" class="form-control" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label class="required">平仓数量</label>
+                    <input type="number" id="close_quantity" class="form-control" 
+                           placeholder="输入平仓数量" step="0.0001" required>
+                </div>
+                
+                <div class="form-group">
+                    <label class="required">平仓价格</label>
+                    <input type="number" id="close_price" class="form-control" 
+                           placeholder="输入平仓价格" step="0.01" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>预计盈亏</label>
+                    <div id="estimated_pnl" style="font-size: 18px; font-weight: bold; padding: 10px; background: #f5f5f5; border-radius: 4px; text-align: center;">
+                        -
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>备注</label>
+                    <textarea id="close_notes" class="form-control" rows="2" 
+                              placeholder="可选：平仓原因或备注"></textarea>
+                </div>
+                
+                <input type="hidden" id="close_security_id">
+                <input type="hidden" id="close_position_type">
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeClosePositionModal()">取消</button>
+                <button type="submit" class="btn btn-primary" id="submitCloseBtn">确认平仓</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Add Adjustment Modal -->
+<div id="adjustmentModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-header">
+            <h3 id="modal-title-adjustment">新增资金调整</h3>
+            <button class="close-btn" onclick="closeAdjustmentModal()">&times;</button>
+        </div>
+        <form id="adjustmentForm" onsubmit="handleAdjustmentSubmit(event)">
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="adj_date" class="required"><span id="label-adj-date">调整日期</span></label>
+                    <input type="date" id="adj_date" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="adj_amount" class="required"><span id="label-adj-amount">调整金额</span></label>
+                    <input type="number" id="adj_amount" class="form-control" 
+                           placeholder="" step="0.01" required>
+                    <small class="form-text" id="hint-adj-amount">正数表示入金，负数表示出金</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="adj_reason" class="required"><span id="label-adj-reason">调整原因</span></label>
+                    <textarea id="adj_reason" class="form-control" rows="3" 
+                              placeholder="" required></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAdjustmentModal()"><span id="btn-cancel-adj">取消</span></button>
+                <button type="submit" class="btn btn-primary" id="submitAdjustmentBtn"><span id="btn-confirm-adj">确认</span></button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<style>
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.stat-label {
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 8px;
+}
+
+.stat-value {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary-color);
+}
+
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 28px;
+    color: #888;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    line-height: 30px;
+}
+
+.close-btn:hover {
+    color: #333;
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.modal-footer {
+    padding: 15px 20px;
+    border-top: 1px solid #eee;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+}
+
+.form-group label.required::after {
+    content: ' *';
+    color: #dc3545;
+}
+
+.form-control {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.form-text {
+    display: block;
+    margin-top: 5px;
+    font-size: 12px;
+    color: #666;
+}
+</style>
+{% endblock %}
+
+{% block extra_script %}
+<script>
+let accountId = null;
+let projectId = null;
+let accountData = null;
+let accountCurrency = 'CNY';  // 默认人民币
+
+// 根据账户货币格式化金额
+function formatCurrency(num) {
+    const symbols = {
+        'CNY': '¥',
+        'USD': '$',
+        'HKD': 'HK$',
+        'USDT': '$'
+    };
+    const symbol = symbols[accountCurrency] || '¥';
+    return symbol + parseFloat(num).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+// Generate consistent color for security symbol
+function getSecurityColor(symbol) {
+    // Use hash function to generate consistent color from symbol
+    let hash = 0;
+    for (let i = 0; i < symbol.length; i++) {
+        hash = symbol.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Define a set of pleasant colors for financial data
+    const colors = [
+        '#3498db', // blue
+        '#9b59b6', // purple
+        '#e74c3c', // red
+        '#f39c12', // orange
+        '#1abc9c', // turquoise
+        '#16a085', // green-blue
+        '#27ae60', // green
+        '#2980b9', // dark blue
+        '#8e44ad', // dark purple
+        '#c0392b', // dark red
+        '#d35400', // dark orange
+        '#2ecc71', // light green
+    ];
+    
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+}
+
+// Get accountId from URL
+function getAccountIdFromUrl() {
+    const pathParts = window.location.pathname.split('/');
+    return pathParts[2]; // /accounts/{id}/
+}
+
+// Go back
+function goBack() {
+    if (projectId) {
+        window.location.href = `/projects/${projectId}/dashboard/`;
+    } else {
+        window.history.back();
+    }
+}
+
+// Load account details
+async function loadAccountDetails() {
+    accountId = {{ account_id }};
+    
+    if (!accountId) {
+        showError('无效的账户ID');
+        setTimeout(() => window.history.back(), 2000);
+        return;
+    }
+    
+    try {
+        // Load account summary data
+        const accountData = await API.get(`/accounts/${accountId}/summary/`);
+        
+        // 保存账户货币类型用于格式化
+        accountCurrency = accountData.currency;
+        
+        // Update header
+        document.getElementById('accountName').textContent = accountData.name || accountData.market_type_display;
+        document.getElementById('marketTypeBadge').textContent = accountData.market_type_display;
+        document.getElementById('currency').textContent = accountData.currency_display || accountData.currency;
+        document.getElementById('createdAt').textContent = new Date(accountData.created_at).toLocaleDateString('zh-CN');
+        
+        // Always show action buttons (already checked permission on backend)
+        document.getElementById('addAdjustmentBtn').style.display = 'inline-block';
+        // actionButtons 默认就是显示的，不需要额外设置
+        
+        // Update stats
+        document.getElementById('startCash').textContent = formatCurrency(accountData.start_cash);
+        document.getElementById('currentCash').textContent = formatCurrency(accountData.current_cash);
+        
+        const pnlColor = accountData.realized_pnl >= 0 ? '#28a745' : '#dc3545';
+        const pnlSign = accountData.realized_pnl >= 0 ? '+' : '';
+        document.getElementById('totalPnL').textContent = pnlSign + formatCurrency(accountData.realized_pnl);
+        document.getElementById('totalPnL').style.color = pnlColor;
+        
+        const returnSign = accountData.return_pct >= 0 ? '+' : '';
+        document.getElementById('returnPct').textContent = `${returnSign}${accountData.return_pct.toFixed(2)}%`;
+        document.getElementById('returnPct').style.color = pnlColor;
+        
+        document.getElementById('tradeCount').textContent = accountData.summary.trade_count;
+        
+        // Load trade stats
+        await loadTradeStats(accountData.summary);
+        
+        // Load positions, pending orders and trades
+        await Promise.all([
+            loadPositions(accountData.positions || []),
+            loadPendingOrders(),
+            loadTradeRecords()
+        ]);
+        
+    } catch (error) {
+        console.error('Failed to load account:', error);
+        showError('加载失败：' + (error.message || '请刷新重试'));
+    }
+}
+
+// Load trade stats
+async function loadTradeStats(summaryData) {
+    try {
+        if (!summaryData) {
+            const response = await API.get(`/accounts/${accountId}/summary/`);
+            summaryData = response.summary;
+        }
+        
+        // 新字段: open_long_count, close_long_count, open_short_count, close_short_count
+        document.getElementById('buyCount').textContent = summaryData.open_long_count + summaryData.open_short_count;
+        document.getElementById('sellCount').textContent = summaryData.close_long_count + summaryData.close_short_count;
+        document.getElementById('totalFee').textContent = formatCurrency(summaryData.total_fees);
+        
+        document.getElementById('buyTotal').textContent = `开多 ${summaryData.open_long_count} / 开空 ${summaryData.open_short_count}`;
+        document.getElementById('sellTotal').textContent = `平多 ${summaryData.close_long_count} / 平空 ${summaryData.close_short_count}`;
+    } catch (error) {
+        console.error('Failed to load trade stats:', error);
+    }
+}
+
+// Load positions
+function loadPositions(positions) {
+    const container = document.getElementById('positionsList');
+    
+    if (!positions || positions.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">📊</div>
+                <div>暂无持仓</div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = positions.map(pos => {
+        let positionsHtml = '';
+        
+        if (pos.long_quantity) {
+            const longValue = pos.long_quantity * pos.long_avg_cost;
+            positionsHtml += `
+                <div class="mobile-card" style="margin-bottom: 10px;">
+                    <div class="mobile-card-primary">
+                        <span style="font-weight: 600; font-size: 16px;">${pos.symbol}</span>
+                        <span class="badge" style="background-color: #28a745;">做多</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">持仓数量</span>
+                        <span class="mobile-card-value">${pos.long_quantity}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">平均成本</span>
+                        <span class="mobile-card-value">${formatCurrency(pos.long_avg_cost)}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">持仓金额</span>
+                        <span class="mobile-card-value" style="font-weight: 600; font-size: 15px;">${formatCurrency(longValue)}</span>
+                    </div>
+                    <button class="btn btn-warning btn-sm" style="width: 100%; margin-top: 10px;" 
+                            onclick="showClosePositionModal(${pos.security_id}, 'long', ${pos.long_quantity}, ${pos.long_avg_cost}, '${pos.symbol}')">
+                        📤 平仓
+                    </button>
+                </div>
+            `;
+        }
+        
+        if (pos.short_quantity) {
+            const shortValue = pos.short_quantity * pos.short_avg_cost;
+            positionsHtml += `
+                <div class="mobile-card" style="margin-bottom: 10px;">
+                    <div class="mobile-card-primary">
+                        <span style="font-weight: 600; font-size: 16px;">${pos.symbol}</span>
+                        <span class="badge" style="background-color: #ffc107; color: #333;">做空</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">持仓数量</span>
+                        <span class="mobile-card-value">${pos.short_quantity}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">平均成本</span>
+                        <span class="mobile-card-value">${formatCurrency(pos.short_avg_cost)}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">持仓金额</span>
+                        <span class="mobile-card-value" style="font-weight: 600; font-size: 15px;">${formatCurrency(shortValue)}</span>
+                    </div>
+                    <button class="btn btn-warning btn-sm" style="width: 100%; margin-top: 10px;" 
+                            onclick="showClosePositionModal(${pos.security_id}, 'short', ${pos.short_quantity}, ${pos.short_avg_cost}, '${pos.symbol}')">
+                        📤 平仓
+                    </button>
+                </div>
+            `;
+        }
+        
+        return positionsHtml;
+    }).join('');
+}
+
+// Load adjustments
+async function loadAdjustments() {
+    try {
+        const response = await API.get(`/cash-adjustments/?account=${accountId}`);
+        const adjustments = response.results || response;
+        
+        if (adjustments.length === 0) {
+            document.getElementById('adjustmentsList').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📝</div>
+                    <div>暂无资金调整记录</div>
+                </div>
+            `;
+            return;
+        }
+        
+        document.getElementById('adjustmentsList').innerHTML = adjustments.map(adj => {
+            const amountColor = adj.amount >= 0 ? '#28a745' : '#dc3545';
+            const amountSign = adj.amount >= 0 ? '+' : '';
+            
+            return `
+                <div class="mobile-card">
+                    <div class="mobile-card-primary">
+                        <span>${new Date(adj.date).toLocaleDateString('zh-CN')}</span>
+                        <span style="font-weight: bold; color: ${amountColor};">
+                            ${amountSign}${formatCurrency(adj.amount)}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">原因</span>
+                        <span class="mobile-card-value">${adj.reason || '-'}</span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+    } catch (error) {
+        console.error('Failed to load adjustments:', error);
+        document.getElementById('adjustmentsList').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Load pending orders
+async function loadPendingOrders() {
+    try {
+        const response = await API.get(`/trades/?account=${accountId}&status=PENDING&ordering=-created_at`);
+        const orders = response.results || response;
+        
+        if (orders.length === 0) {
+            document.getElementById('pendingOrders').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <div>暂无待成交订单</div>
+                </div>
+            `;
+            return;
+        }
+        
+        document.getElementById('pendingOrders').innerHTML = orders.map(order => {
+            const securitySymbol = order.security_info.symbol;
+            const securityColor = getSecurityColor(securitySymbol);
+            
+            return `
+            <div class="mobile-card" style="border-left: 4px solid ${securityColor};">
+                <div class="mobile-card-primary">
+                    <span style="font-weight: 600;">${securitySymbol}</span>
+                    <span class="badge" style="background: #ffc107; color: #333;">
+                        ⏳ ${order.action_display}
+                    </span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">数量</span>
+                    <span class="mobile-card-value">${order.quantity}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">价格</span>
+                    <span class="mobile-card-value">${formatCurrency(parseFloat(order.price))}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">冻结资金</span>
+                    <span class="mobile-card-value">${formatCurrency(order.frozen_cash)}</span>
+                </div>
+                <div class="mobile-card-row">
+                    <span class="mobile-card-label">创建时间</span>
+                    <span class="mobile-card-value">${new Date(order.created_at).toLocaleString('zh-CN')}</span>
+                </div>
+                <div style="display: flex; gap: 10px; margin-top: 10px;">
+                    <button class="btn btn-success btn-sm" style="flex: 1;" onclick="fillOrder(${order.id})">
+                        ✅ 确认成交
+                    </button>
+                    <button class="btn btn-secondary btn-sm" style="flex: 1;" onclick="cancelOrder(${order.id})">
+                        ❌ 取消
+                    </button>
+                </div>
+            </div>
+            `;
+        }).join('');
+    } catch (error) {
+        console.error('Failed to load pending orders:', error);
+        document.getElementById('pendingOrders').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Confirm order filled
+async function fillOrder(tradeId) {
+    if (!confirm('确认成交此订单？\n\n成交后将扣除资金并生成持仓。')) return;
+    
+    try {
+        await API.post(`/trades/${tradeId}/fill/`);
+        showSuccess('订单已成交！');
+        
+        // Reload all data
+        await loadAccountDetails();
+    } catch (error) {
+        console.error('Fill order error:', error);
+        
+        // If order is already filled/cancelled, just reload
+        if (error.response?.status === 400) {
+            console.log('Order already processed, reloading...');
+            await loadAccountDetails();
+        } else {
+            showError('成交失败：' + (error.message || '请重试'));
+        }
+    }
+}
+
+// Cancel order
+async function cancelOrder(tradeId) {
+    if (!confirm('确认取消此订单？\n\n取消后将释放冻结资金。')) return;
+    
+    try {
+        await API.post(`/trades/${tradeId}/cancel/`);
+        showSuccess('订单已取消');
+        
+        // Reload data
+        await loadAccountDetails();
+    } catch (error) {
+        console.error('Cancel order error:', error);
+        
+        // If order is already processed, just reload
+        if (error.response?.status === 400) {
+            console.log('Order already processed, reloading...');
+            await loadAccountDetails();
+        } else {
+            showError('取消失败：' + (error.message || '请重试'));
+        }
+    }
+}
+
+// Show close position modal
+function showClosePositionModal(securityId, positionType, currentQty, avgCost, symbol) {
+    document.getElementById('closePositionModal').style.display = 'flex';
+    document.getElementById('close_security_id').value = securityId;
+    document.getElementById('close_position_type').value = positionType;
+    document.getElementById('close_security_name').value = symbol;
+    document.getElementById('close_position_type_display').value = positionType === 'long' ? '做多' : '做空';
+    document.getElementById('close_current_quantity').value = currentQty;
+    document.getElementById('close_avg_cost').value = formatCurrency(avgCost);
+    document.getElementById('close_quantity').value = currentQty;
+    document.getElementById('close_quantity').max = currentQty;
+    document.getElementById('close_price').value = '';
+    document.getElementById('close_notes').value = '';
+    document.getElementById('estimated_pnl').textContent = '-';
+    document.getElementById('estimated_pnl').style.color = '#666';
+    
+    // Add event listeners for real-time PnL calculation
+    const qtyInput = document.getElementById('close_quantity');
+    const priceInput = document.getElementById('close_price');
+    
+    const calculatePnL = () => {
+        const qty = parseFloat(qtyInput.value) || 0;
+        const price = parseFloat(priceInput.value) || 0;
+        
+        if (qty > 0 && price > 0) {
+            let pnl;
+            if (positionType === 'long') {
+                // 做多盈亏 = (卖出价 - 买入价) × 数量
+                pnl = (price - avgCost) * qty;
+            } else {
+                // 做空盈亏 = (卖出价 - 买入价) × 数量
+                pnl = (avgCost - price) * qty;
+            }
+            
+            const pnlColor = pnl >= 0 ? '#28a745' : '#dc3545';
+            const pnlSign = pnl >= 0 ? '+' : '';
+            document.getElementById('estimated_pnl').textContent = pnlSign + formatCurrency(Math.abs(pnl));
+            document.getElementById('estimated_pnl').style.color = pnlColor;
+        }
+    };
+    
+    qtyInput.addEventListener('input', calculatePnL);
+    priceInput.addEventListener('input', calculatePnL);
+}
+
+// Close close position modal
+function closeClosePositionModal() {
+    document.getElementById('closePositionModal').style.display = 'none';
+    document.getElementById('closePositionForm').reset();
+}
+
+// Handle close position
+async function handleClosePosition(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('submitCloseBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '处理中...';
+    
+    try {
+        const formData = {
+            account: parseInt(accountId),
+            security: parseInt(document.getElementById('close_security_id').value),
+            position_type: document.getElementById('close_position_type').value,
+            quantity: parseFloat(document.getElementById('close_quantity').value),
+            close_price: parseFloat(document.getElementById('close_price').value),
+            notes: document.getElementById('close_notes').value || '平仓操作'
+        };
+        
+        await API.post('/trades/close_position/', formData);
+        
+        showSuccess('平仓成功！');
+        closeClosePositionModal();
+        
+        // Reload all data
+        await loadAccountDetails();
+        
+    } catch (error) {
+        console.error('Close position error:', error);
+        showError(error.message || '平仓失败，请重试');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '确认平仓';
+    }
+}
+
+// Load trade records
+async function loadTradeRecords(limit = 10) {
+    try {
+        console.log('Loading trade records for account:', accountId);
+        const url = limit ? `/trades/?account=${accountId}&ordering=-traded_at&page_size=${limit}` : `/trades/?account=${accountId}&ordering=-traded_at`;
+        const response = await API.get(url);
+        console.log('Trades response:', response);
+        const trades = response.results || response;
+        console.log('Trades count:', trades.length);
+        
+        if (trades.length === 0) {
+            document.getElementById('tradeRecords').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">💹</div>
+                    <div>暂无交易记录</div>
+                    <div style="margin-top: 10px;">
+                        <a href="/accounts/${accountId}/trades/new/" class="btn btn-primary">
+                            + 添加第一笔交易
+                        </a>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+        
+        const tradeHtml = trades.map(t => {
+            console.log('Rendering trade:', t);
+            const actionColors = {
+                'OPEN_LONG': '#28a745',
+                'CLOSE_LONG': '#17a2b8',
+                'OPEN_SHORT': '#ffc107',
+                'CLOSE_SHORT': '#dc3545'
+            };
+            
+            const actionIcons = {
+                'OPEN_LONG': '📈',
+                'CLOSE_LONG': '📊',
+                'OPEN_SHORT': '📉',
+                'CLOSE_SHORT': '📋'
+            };
+            
+            const actionColor = actionColors[t.action] || '#666';
+            const actionIcon = actionIcons[t.action] || '💹';
+            const securityName = t.security_info ? t.security_info.symbol : 'N/A';
+            const securityColor = getSecurityColor(securityName);
+            
+            return `
+                <div class="mobile-card" style="border-left: 4px solid ${securityColor};">
+                    <div class="mobile-card-primary">
+                        <span style="font-weight: 600;">${securityName}</span>
+                        <span class="badge" style="background-color: ${actionColor};">
+                            ${actionIcon} ${t.action_display}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">数量</span>
+                        <span class="mobile-card-value">${t.quantity}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">价格</span>
+                        <span class="mobile-card-value">${t.price}</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">交易金额</span>
+                        <span class="mobile-card-value" style="font-weight: bold;">
+                            ${formatCurrency(t.total_amount)}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">现金影响</span>
+                        <span class="mobile-card-value" style="color: ${t.cash_impact >= 0 ? '#28a745' : '#dc3545'}; font-weight: 600;">
+                            ${t.cash_impact >= 0 ? '+' : ''}${formatCurrency(t.cash_impact)}
+                        </span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">交易时间</span>
+                        <span class="mobile-card-value">${new Date(t.traded_at).toLocaleString('zh-CN')}</span>
+                    </div>
+                    ${t.notes ? `
+                    <div class="mobile-card-row" style="flex-direction: column; align-items: flex-start; padding-top: 10px; border-top: 1px solid #eee;">
+                        <span class="mobile-card-label">备注</span>
+                        <span class="mobile-card-value" style="font-size: 13px; color: #666; white-space: pre-wrap;">
+                            ${t.notes.substring(0, 100)}${t.notes.length > 100 ? '...' : ''}
+                        </span>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        console.log('Generated trade HTML length:', tradeHtml.length);
+        document.getElementById('tradeRecords').innerHTML = tradeHtml;
+        console.log('Trade records rendered');
+        
+    } catch (error) {
+        console.error('Failed to load trade records:', error);
+        document.getElementById('tradeRecords').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Load operation records (trades + adjustments combined)
+async function loadOperationRecords(limit = 10) {
+    try {
+        console.log('Loading operation records for account:', accountId);
+        
+        // Load both trades and adjustments
+        const [tradesResp, adjResp] = await Promise.all([
+            API.get(limit ? `/trades/?account=${accountId}&page_size=100` : `/trades/?account=${accountId}`),
+            API.get(limit ? `/cash-adjustments/?account=${accountId}&page_size=100` : `/cash-adjustments/?account=${accountId}`)
+        ]);
+        
+        console.log('Adjustments response:', adjResp);
+        
+        const trades = tradesResp.results || tradesResp || [];
+        const adjustments = adjResp.results || adjResp || [];
+        
+        console.log('Trades for operations:', trades.length);
+        console.log('Adjustments for operations:', adjustments.length);
+        
+        // Combine and sort by time
+        const operations = [];
+        
+        // Add trades
+        trades.forEach(t => {
+            operations.push({
+                type: 'trade',
+                time: new Date(t.traded_at),
+                data: t
+            });
+        });
+        
+        // Add adjustments
+        adjustments.forEach(adj => {
+            operations.push({
+                type: 'adjustment',
+                time: new Date(adj.created_at),
+                data: adj
+            });
+        });
+        
+        // Sort by time descending
+        operations.sort((a, b) => b.time - a.time);
+        
+        // Apply limit if specified
+        const displayOps = limit ? operations.slice(0, limit) : operations;
+        
+        console.log('Display operations:', displayOps.length);
+        console.log('Operations details:', displayOps);
+        
+        if (displayOps.length === 0) {
+            document.getElementById('operationRecords').innerHTML = `
+                <div class="empty-state">
+                    <div class="empty-icon">📋</div>
+                    <div>暂无操作记录</div>
+                </div>
+            `;
+            return;
+        }
+        
+        const html = displayOps.map(op => {
+            console.log('Rendering operation:', op.type, op.data);
+            if (op.type === 'trade') {
+                const t = op.data;
+                const actionColors = {
+                    'OPEN_LONG': '#28a745',
+                    'CLOSE_LONG': '#17a2b8',
+                    'OPEN_SHORT': '#ffc107',
+                    'CLOSE_SHORT': '#dc3545'
+                };
+                const actionColor = actionColors[t.action] || '#666';
+                const securityName = t.security_info ? t.security_info.symbol : 'N/A';
+                const securityColor = getSecurityColor(securityName);
+                
+                return `
+                    <div class="mobile-card" style="border-left: 4px solid ${securityColor};">
+                        <div class="mobile-card-primary">
+                            <span style="font-weight: 600;">${securityName}</span>
+                            <span class="badge" style="background-color: ${actionColor};">
+                                💹 ${t.action_display}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">数量</span>
+                            <span class="mobile-card-value">${t.quantity}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">价格</span>
+                            <span class="mobile-card-value">${t.price}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">现金影响</span>
+                            <span class="mobile-card-value" style="color: ${t.cash_impact >= 0 ? '#28a745' : '#dc3545'}; font-weight: 600;">
+                                ${t.cash_impact >= 0 ? '+' : ''}${formatCurrency(t.cash_impact)}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">时间</span>
+                            <span class="mobile-card-value">${new Date(t.traded_at).toLocaleString('zh-CN')}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                // Adjustment
+                const adj = op.data;
+                const amount = parseFloat(adj.amount);
+                const amountColor = amount >= 0 ? '#28a745' : '#dc3545';
+                const amountSign = amount >= 0 ? '+' : '';
+                
+                return `
+                    <div class="mobile-card" style="border-left: 3px solid #17a2b8;">
+                        <div class="mobile-card-primary">
+                            <span style="font-weight: 600;">💰 资金调整</span>
+                            <span class="badge" style="background-color: #17a2b8;">
+                                调整
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">调整金额</span>
+                            <span class="mobile-card-value" style="color: ${amountColor}; font-weight: 600;">
+                                ${amountSign}${formatCurrency(amount)}
+                            </span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">原因</span>
+                            <span class="mobile-card-value">${adj.reason || '-'}</span>
+                        </div>
+                        <div class="mobile-card-row">
+                            <span class="mobile-card-label">时间</span>
+                            <span class="mobile-card-value">${new Date(adj.created_at).toLocaleString('zh-CN')}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }).join('');
+        
+        console.log('Final HTML length:', html.length);
+        console.log('Setting innerHTML for operationRecords');
+        const container = document.getElementById('operationRecords');
+        console.log('Container found:', !!container);
+        console.log('Container before:', container.innerHTML.substring(0, 100));
+        
+        // Clear and set new content
+        container.innerHTML = '';
+        container.innerHTML = html;
+        
+        console.log('Container after:', container.innerHTML.substring(0, 100));
+        
+        // Force DOM update
+        await new Promise(resolve => setTimeout(resolve, 0));
+        console.log('Operation records rendered successfully');
+        console.log('Container child count:', container.children.length);
+        
+        // Debug: check if elements are visible
+        const firstCard = container.querySelector('.mobile-card');
+        if (firstCard) {
+            console.log('First card found:', firstCard);
+            console.log('First card display:', window.getComputedStyle(firstCard).display);
+            console.log('First card visibility:', window.getComputedStyle(firstCard).visibility);
+            console.log('First card height:', window.getComputedStyle(firstCard).height);
+        }
+        
+    } catch (error) {
+        console.error('Failed to load operation records:', error);
+        document.getElementById('operationRecords').innerHTML = '<div class="empty-state">加载失败</div>';
+    }
+}
+
+// Toggle all trades
+let showingAllTrades = false;
+async function toggleAllTrades() {
+    const btn = document.getElementById('viewAllTradesBtn');
+    
+    if (showingAllTrades) {
+        await loadTradeRecords(10);
+        btn.textContent = '展开全部';
+        showingAllTrades = false;
+    } else {
+        await loadTradeRecords(null);
+        btn.textContent = '收起';
+        showingAllTrades = true;
+    }
+}
+
+// View operation records (first time)
+let operationsLoaded = false;
+async function viewOperationRecords() {
+    console.log('Loading operation records for the first time...');
+    
+    const container = document.getElementById('operationRecords');
+    
+    // Show loading state
+    container.innerHTML = `
+        <div class="loading">
+            <div class="spinner"></div>
+            <div>正在加载操作记录...</div>
+        </div>
+    `;
+    
+    try {
+        console.log('Container set to loading, now fetching data...');
+        await loadOperationRecords(null); // Load all records
+        operationsLoaded = true;
+        
+        console.log('Data loaded, updating UI...');
+        // Show toggle button
+        const btn = document.getElementById('viewAllOpsBtn');
+        btn.style.display = 'inline-block';
+        btn.textContent = '收起';
+        console.log('Toggle button shown');
+    } catch (error) {
+        console.error('Failed to load operations:', error);
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">❌</div>
+                <div>加载失败: ${error.message || '未知错误'}</div>
+                <div style="margin-top: 15px;">
+                    <button class="btn btn-primary" onclick="viewOperationRecords()">
+                        🔄 重试
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+// Toggle all operations
+let showingAllOps = true; // Start with all visible after first load
+async function toggleAllOperations() {
+    const btn = document.getElementById('viewAllOpsBtn');
+    
+    if (!operationsLoaded) {
+        await viewOperationRecords();
+        return;
+    }
+    
+    if (showingAllOps) {
+        await loadOperationRecords(10);
+        btn.textContent = '展开全部';
+        showingAllOps = false;
+    } else {
+        await loadOperationRecords(null);
+        btn.textContent = '收起';
+        showingAllOps = true;
+    }
+}
+
+// Show add adjustment modal
+function showAddAdjustmentModal() {
+    document.getElementById('adjustmentModal').style.display = 'flex';
+    document.getElementById('adj_date').valueAsDate = new Date();
+}
+
+// Close adjustment modal
+function closeAdjustmentModal() {
+    document.getElementById('adjustmentModal').style.display = 'none';
+    document.getElementById('adjustmentForm').reset();
+}
+
+// Handle adjustment submission
+async function handleAdjustmentSubmit(event) {
+    event.preventDefault();
+    
+    const submitBtn = document.getElementById('submitAdjustmentBtn');
+    submitBtn.disabled = true;
+    submitBtn.textContent = '提交中...';
+    
+    try {
+        const formData = {
+            account: parseInt(accountId),
+            date: document.getElementById('adj_date').value,
+            amount: parseFloat(document.getElementById('adj_amount').value),
+            reason: document.getElementById('adj_reason').value
+        };
+        
+        await API.post('/cash-adjustments/', formData);
+        
+        showSuccess('资金调整添加成功！');
+        closeAdjustmentModal();
+        
+        // Reload account data
+        await loadAccountDetails();
+        
+        // Reload operation records if already loaded
+        if (operationsLoaded) {
+            await loadOperationRecords(showingAllOps ? null : 10);
+        }
+        
+    } catch (error) {
+        console.error('Failed to add adjustment:', error);
+        showError(error.message || '添加失败，请重试');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '确认';
+    }
+}
+
+// 删除账户
+async function deleteAccount() {
+    const accountName = document.getElementById('accountName').textContent;
+    const confirmMsg = `${t('confirm_delete_account')} "${accountName}"？\n\n⚠️ ${t('delete_warning')}`;
+    
+    if (!confirm(confirmMsg)) {
+        return;
+    }
+    
+    try {
+        await API.delete(`/accounts/${accountId}/`);
+        alert(`✅ ${t('account_deleted')}`);
+        window.location.href = '/';
+    } catch (error) {
+        console.error('Failed to delete account:', error);
+        alert(`${t('delete_failed')}` + (error.message || '请重试'));
+    }
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    applyTranslations();
+    loadAccountDetails();
+});
+
+// Apply translations
+function applyTranslations() {
+    const translations = {
+        'nav-home': 'home',
+        'nav-account-list': 'account_list',
+        'nav-account-detail': 'account_detail',
+        'btn-back': 'back',
+        'text-loading': 'loading',
+        'btn-add-security': 'add_security',
+        'btn-add-trade': 'add_trade',
+        'btn-cash-adjustment': 'cash_adjustment',
+        'btn-delete-account': 'delete_account',
+        'label-currency': 'currency',
+        'label-created-at': 'created_at',
+        'stat-start-cash': 'start_cash',
+        'stat-current-cash': 'current_cash',
+        'stat-total-pnl': 'total_pnl',
+        'stat-trade-count': 'trade_count',
+        'title-trade-stats': 'trade_statistics',
+        'stat-buy-count': 'buy_count',
+        'stat-sell-count': 'sell_count',
+        'stat-total-fee': 'fee',
+        'title-pending-orders': 'pending_orders',
+        'loading-pending': 'loading',
+        'title-current-positions': 'current_positions',
+        'loading-positions': 'loading',
+        'title-trade-records': 'trade_records',
+        'btn-view-all-trades': 'view_all',
+        'loading-trades': 'loading',
+        'title-operation-records': 'operation_records',
+        'btn-view-all-ops': 'view_all',
+        'text-click-to-view': 'click_to_view',
+        'btn-view-operations': 'view_operations',
+        'modal-title-adjustment': 'cash_adjustment_title',
+        'label-adj-date': 'adjustment_date',
+        'label-adj-amount': 'adjustment_amount',
+        'hint-adj-amount': 'adjustment_amount_hint',
+        'label-adj-reason': 'adjustment_reason',
+        'btn-cancel-adj': 'cancel',
+        'btn-confirm-adj': 'confirm'
+    };
+    
+    for (const [id, key] of Object.entries(translations)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+    }
+    
+    // Update placeholders
+    const adjAmount = document.getElementById('adj_amount');
+    const adjReason = document.getElementById('adj_reason');
+    if (adjAmount) adjAmount.placeholder = t('adjustment_amount_placeholder');
+    if (adjReason) adjReason.placeholder = t('adjustment_reason_placeholder');
+}
+</script>
+{% endblock %}
