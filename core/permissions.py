@@ -24,6 +24,26 @@ class IsAccountOwner(permissions.BasePermission):
     """
     message = "您无权访问此账户下的资源"
     
+    def has_permission(self, request, view):
+        # 对于列表视图，检查query参数中的account是否属于当前用户
+        account_id = request.query_params.get('account')
+        print(f"DEBUG: has_permission called - account_id={account_id}, user={request.user.username if request.user.is_authenticated else 'anonymous'}")
+        
+        if account_id:
+            try:
+                from .models import MarketAccount
+                # 确保account_id是整数
+                account_id = int(account_id)
+                print(f"DEBUG: Looking for account_id={account_id}")
+                account = MarketAccount.objects.get(id=account_id, owner=request.user)
+                print(f"DEBUG: Account found: {account.name}")
+                return True
+            except (ValueError, MarketAccount.DoesNotExist) as e:
+                print(f"DEBUG: Account not found or invalid: {e}")
+                return False
+        print("DEBUG: No account_id specified, allowing access")
+        return True  # 如果没有指定account，允许访问（会在queryset中过滤）
+    
     def has_object_permission(self, request, view, obj):
         # obj 可以是 Trade, Security, CashAdjustment 等
         return obj.account.owner == request.user

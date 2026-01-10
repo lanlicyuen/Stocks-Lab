@@ -1,0 +1,870 @@
+{% extends 'base_new.html' %}
+
+{% block title %}交易分享 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span>首页</span></a>
+    <a href="/accounts/"><span>账户列表</span></a>
+    <a href="/accounts/{{ account_id }}/"><span>账户详情</span></a>
+    <a href="#" class="active"><span>交易分享</span></a>
+</div>
+
+<div class="card">
+    <div class="button-group">
+        <button class="btn" onclick="generateTradeImage()">生成图片</button>
+        <button class="btn btn-secondary" onclick="generateTradeNote()">导出交易笔记</button>
+        <button class="btn btn-primary" id="downloadBtn" onclick="downloadImage()" style="display: none;">下载图片</button>
+        <button class="btn btn-primary" id="downloadNoteBtn" onclick="downloadNote()" style="display: none;">下载笔记</button>
+    </div>
+    <div class="card-body">
+        <!-- 交易选择 -->
+        <div id="trade-selector" style="margin-bottom: 20px;">
+            <label style="font-weight: 600; margin-bottom: 10px; display: block;">选择要分享的交易:</label>
+            <select id="tradeSelect" class="form-control" style="max-width: 400px;">
+                <option value="">加载中...</option>
+            </select>
+        </div>
+        
+        <!-- 预览区域 -->
+        <div id="preview-container" style="max-width: 540px; margin: 0 auto;">
+            <div id="share-canvas" style="display: none;">
+                <!-- 这个div会被转换成图片 -->
+            </div>
+            <div id="preview-image"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.form-control {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.share-image {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+}
+
+.share-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #00C853 0%, #00E676 100%);
+}
+
+.share-bg.loss {
+    background: linear-gradient(135deg, #F44336 0%, #FF5252 100%);
+}
+
+.watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 120px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    pointer-events: none;
+    letter-spacing: 20px;
+}
+
+.share-header {
+    position: absolute;
+    top: 60px;
+    left: 60px;
+}
+
+.platform-logo {
+    font-size: 48px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.pnl-section {
+    position: absolute;
+    top: 200px;
+    left: 0;
+    right: 0;
+    text-align: center;
+}
+
+.pnl-label {
+    display: inline-block;
+    padding: 12px 40px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 30px;
+    font-size: 32px;
+    color: white;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.pnl-value {
+    font-size: 160px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    line-height: 1;
+    margin-bottom: 20px;
+}
+
+.pnl-currency {
+    font-size: 80px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.mascot-container {
+    position: absolute;
+    top: 550px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mascot-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 30px rgba(0,0,0,0.3));
+}
+
+.mascot-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-content {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.15);
+    border: 4px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    width: 400px;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.placeholder-icon {
+    font-size: 180px;
+    line-height: 1;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+}
+
+.placeholder-text {
+    font-size: 48px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+.trade-info {
+    position: absolute;
+    bottom: 220px;
+    left: 40px;
+    right: 40px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 25px 40px;
+    backdrop-filter: blur(15px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    transform: scale(0.95);
+    transform-origin: center bottom;
+}
+
+.trade-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.trade-row:last-child {
+    margin-bottom: 0;
+}
+
+.trade-left {
+    flex: 1;
+}
+
+.trade-label {
+    font-size: 36px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-bottom: 10px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-weight: 500;
+}
+
+.trade-value {
+    font-size: 60px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.trade-code {
+    font-size: 40px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 12px;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    font-weight: 600;
+}
+
+.trade-name {
+    font-size: 68px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.footer-info-new {
+    position: absolute;
+    bottom: 60px;
+    left: 60px;
+    right: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
+.user-info-left {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.user-name {
+    font-size: 40px;
+    color: white;
+    font-weight: 600;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.share-date {
+    font-size: 28px;
+    color: rgba(255, 255, 255, 0.85);
+    text-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.qrcode-container {
+    width: 150px;
+    height: 150px;
+    background: white;
+    border-radius: 15px;
+    padding: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
+.qrcode-container img {
+    width: 130px !important;
+    height: 130px !important;
+    display: block;
+}
+
+.qrcode-container canvas {
+    width: 130px !important;
+    height: 130px !important;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #e083eb 0%, #e5475c 100%);
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs2@0.0.2/qrcode.min.js"></script>
+
+<script>
+const accountId = {{ account_id }};
+let trades = [];
+let selectedTrade = null;
+
+// 加载交易记录
+async function loadTrades() {
+    try {
+        const response = await API.get(`/trades/?account=${accountId}`);
+        
+        // 处理响应格式
+        if (Array.isArray(response)) {
+            trades = response;
+        } else if (response && Array.isArray(response.results)) {
+            trades = response.results;
+        } else {
+            trades = [];
+        }
+        
+        // 只显示已完成的交易
+        trades = trades.filter(t => t.status === 'FILLED');
+        
+        console.log('Loaded trades:', trades);
+        renderTradeSelector();
+        
+    } catch (error) {
+        console.error('Failed to load trades:', error);
+        showError('加载交易记录失败');
+    }
+}
+
+// 渲染交易选择器
+function renderTradeSelector() {
+    const select = document.getElementById('tradeSelect');
+    
+    if (trades.length === 0) {
+        select.innerHTML = '<option value="">暂无已完成的交易</option>';
+        return;
+    }
+    
+    const options = trades.map(trade => {
+        const date = new Date(trade.traded_at).toLocaleDateString('zh-CN');
+        const action = getActionDisplay(trade.action);
+        const symbol = trade.security_info?.symbol || trade.security?.symbol || trade.security_symbol || 'N/A';
+        const name = trade.security_info?.name || trade.security?.name || trade.security_name || '';
+        
+        // 计算盈亏
+        let pnl = parseFloat(trade.realized_pnl || 0);
+        
+        // 如果是平仓且盈亏为0，自动计算
+        if ((trade.action === 'CLOSE_LONG' || trade.action === 'CLOSE_SHORT') && pnl === 0) {
+            const openAction = trade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT';
+            const openTrade = trades.find(t => 
+                t.security_info?.symbol === trade.security_info?.symbol &&
+                t.action === openAction &&
+                parseFloat(t.quantity) === parseFloat(trade.quantity) &&
+                new Date(t.traded_at) < new Date(trade.traded_at)
+            );
+            
+            if (openTrade) {
+                const openPrice = parseFloat(openTrade.price);
+                const closePrice = parseFloat(trade.price);
+                const quantity = parseFloat(trade.quantity);
+                
+                if (trade.action === 'CLOSE_LONG') {
+                    pnl = (closePrice - openPrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
+                } else {
+                    pnl = (openPrice - closePrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
+                }
+            }
+        }
+        
+        const pnlText = pnl !== 0 ? (pnl >= 0 ? `盈利+${pnl.toFixed(2)}` : `亏损${pnl.toFixed(2)}`) : '';
+        
+        return `<option value="${trade.id}">${date} - ${symbol} ${name} ${action} ${trade.quantity}股 @ ${trade.price} ${pnlText}</option>`;
+    }).join('');
+    
+    select.innerHTML = '<option value="">请选择交易...</option>' + options;
+}
+
+// 获取操作显示文本
+function getActionDisplay(action) {
+    const actions = {
+        'OPEN_LONG': '开多',
+        'CLOSE_LONG': '平多',
+        'OPEN_SHORT': '开空',
+        'CLOSE_SHORT': '平空'
+    };
+    return actions[action] || action;
+}
+
+// 生成交易分享图
+async function generateTradeImage() {
+    const tradeId = document.getElementById('tradeSelect').value;
+    
+    if (!tradeId) {
+        showError('请先选择一个交易');
+        return;
+    }
+    
+    selectedTrade = trades.find(t => t.id == tradeId);
+    if (!selectedTrade) {
+        showError('未找到选中的交易');
+        return;
+    }
+    
+    // 打印完整的交易数据以便调试
+    console.log('Selected trade full data:', selectedTrade);
+    
+    // 获取股票信息 - 使用正确的字段名 security_info
+    const symbol = selectedTrade.security_info?.symbol || 
+                   selectedTrade.security?.symbol || 
+                   selectedTrade.security_symbol || 
+                   selectedTrade.symbol || 
+                   '未知代码';
+    const name = selectedTrade.security_info?.name || 
+                 selectedTrade.security?.name || 
+                 selectedTrade.security_name || 
+                 selectedTrade.name || 
+                 '股票名称';
+    
+    // 计算盈亏
+    let pnl = parseFloat(selectedTrade.realized_pnl || 0);
+    
+    // 如果是平仓操作且盈亏为0，尝试自动计算
+    if ((selectedTrade.action === 'CLOSE_LONG' || selectedTrade.action === 'CLOSE_SHORT') && pnl === 0) {
+        // 查找对应的开仓交易
+        const openAction = selectedTrade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT';
+        const openTrade = trades.find(t => 
+            t.security_info?.symbol === selectedTrade.security_info?.symbol &&
+            t.action === openAction &&
+            parseFloat(t.quantity) === parseFloat(selectedTrade.quantity) &&
+            new Date(t.traded_at) < new Date(selectedTrade.traded_at)
+        );
+        
+        if (openTrade) {
+            const openPrice = parseFloat(openTrade.price);
+            const closePrice = parseFloat(selectedTrade.price);
+            const quantity = parseFloat(selectedTrade.quantity);
+            
+            // 计算盈亏：(平仓价 - 开仓价) × 数量 - 手续费
+            if (selectedTrade.action === 'CLOSE_LONG') {
+                pnl = (closePrice - openPrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+            } else {
+                pnl = (openPrice - closePrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+            }
+            
+            console.log('Auto calculated P&L:', {
+                openPrice,
+                closePrice,
+                quantity,
+                calculatedPnl: pnl,
+                openTrade: openTrade
+            });
+        }
+    }
+    
+    const totalCost = parseFloat(selectedTrade.quantity) * parseFloat(selectedTrade.price) + parseFloat(selectedTrade.fee || 0);
+    const pnlPercent = totalCost > 0 ? (pnl / totalCost * 100) : 0;
+    const isProfit = pnl >= 0;
+    
+    // 格式化盈亏金额 - 总是显示
+    const pnlDisplay = `${isProfit ? '+' : ''}${pnl.toFixed(2)}`;
+    
+    console.log('Trade info:', {
+        symbol, 
+        name, 
+        pnl, 
+        pnlPercent, 
+        isProfit, 
+        totalCost, 
+        pnlDisplay,
+        realized_pnl: selectedTrade.realized_pnl,
+        action: selectedTrade.action
+    });
+    
+    // 创建分享图HTML
+    const shareHTML = `
+        <div class="share-image">
+            <div class="share-bg ${isProfit ? '' : 'loss'}"></div>
+            
+            <!-- 背景水印 -->
+            <div class="watermark">1PLABS PRO</div>
+            
+            <!-- 平台Logo -->
+            <div class="share-header">
+                <div class="platform-logo">📊 Stocks-Lab</div>
+            </div>
+            
+            <!-- 盈亏百分比 -->
+            <div class="pnl-section">
+                <div class="pnl-label">${isProfit ? '已实现盈利' : '已实现亏损'}</div>
+                <div class="pnl-value">
+                    ${isProfit ? '+' : ''}${pnl.toFixed(2)} <span class="pnl-currency">港元</span>
+                </div>
+                <div style="font-size: 56px; color: rgba(255,255,255,0.9); margin-top: 20px;">
+                    ${isProfit ? '+' : ''}${pnlPercent.toFixed(2)}%
+                </div>
+            </div>
+            
+            <!-- 卡通人物 -->
+            <div class="mascot-container">
+                <img src="/static/images/mascot.png" alt="Mascot" class="mascot-image" 
+                     onerror="this.style.display='none'; this.parentElement.querySelector('.mascot-placeholder').style.display='flex';">
+                <div class="mascot-placeholder" style="display: none;">
+                    <div class="placeholder-content">
+                        <div class="placeholder-icon">${isProfit ? '🎉' : '💪'}</div>
+                        <div class="placeholder-text">${isProfit ? 'Profit' : 'Loss'}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 交易信息 -->
+            <div class="trade-info">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 40px;">
+                    <!-- 股票代码和名称 -->
+                    <div style="flex: 0 0 auto; text-align: center;">
+                        <div class="trade-code">${symbol}</div>
+                        <div class="trade-name">${name}</div>
+                    </div>
+                    
+                    <!-- 操作和盈亏 -->
+                    <div style="flex: 0 0 auto; text-align: center;">
+                        <div class="trade-label" style="margin-bottom: 8px;">操作</div>
+                        <div class="trade-value" style="display: flex; align-items: center; gap: 15px;">
+                            <span>${getActionDisplay(selectedTrade.action)}</span>
+                            <span style="color: ${isProfit ? '#FF3B30' : '#333333'}; font-size: 52px; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${pnlDisplay}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- 平均价 -->
+                    <div style="flex: 0 0 auto; text-align: center;">
+                        <div class="trade-label" style="margin-bottom: 8px;">平均价</div>
+                        <div class="trade-value">${parseFloat(selectedTrade.price).toFixed(3)}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部信息 -->
+            <div class="footer-info-new">
+                <div class="user-info-left">
+                    <div class="user-name">${selectedTrade.account_name || 'User'}</div>
+                    <div class="share-date">${new Date(selectedTrade.traded_at).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})} ${new Date(selectedTrade.traded_at).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</div>
+                </div>
+                <div class="qrcode-container" id="qrcode-${selectedTrade.id}"></div>
+            </div>
+        </div>
+    `;
+    
+    // 渲染到隐藏的canvas
+    const canvas = document.getElementById('share-canvas');
+    canvas.innerHTML = shareHTML;
+    canvas.style.display = 'block';
+    
+    // 生成二维码
+    const qrContainer = canvas.querySelector(`#qrcode-${selectedTrade.id}`);
+    if (qrContainer && typeof QRCode !== 'undefined') {
+        // 清空容器
+        qrContainer.innerHTML = '';
+        
+        // 生成分享URL
+        const shareUrl = `${window.location.origin}/accounts/${accountId}/trades/${selectedTrade.id}/`;
+        
+        // 使用QRCode库生成二维码
+        new QRCode(qrContainer, {
+            text: shareUrl,
+            width: 130,
+            height: 130,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.M
+        });
+    }
+    
+    // 等待图片和二维码加载
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // 使用html2canvas生成图片
+    try {
+        const canvasElement = await html2canvas(canvas, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+            width: 1080,
+            height: 1920
+        });
+        
+        // 隐藏canvas
+        canvas.style.display = 'none';
+        
+        // 显示预览
+        const preview = document.getElementById('preview-image');
+        preview.innerHTML = `
+            <img src="${canvasElement.toDataURL('image/png')}" 
+                 style="width: 100%; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-primary" onclick="downloadImage('${canvasElement.toDataURL('image/png')}')">
+                    💾 下载图片
+                </button>
+            </div>
+        `;
+        
+        showSuccess('图片生成成功！');
+        
+    } catch (error) {
+        console.error('Failed to generate image:', error);
+        showError('生成图片失败: ' + error.message);
+    }
+}
+
+// 下载图片
+function downloadImage(dataUrl) {
+    const link = document.createElement('a');
+    link.download = `交易分享-${new Date().getTime()}.png`;
+    link.href = dataUrl;
+    link.click();
+}
+
+// Toast提示
+function showError(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '❌ ' + message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function showSuccess(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '✅ ' + message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// 生成交易笔记
+async function generateTradeNote() {
+    const tradeId = document.getElementById('tradeSelect').value;
+    if (!tradeId) {
+        showError('请先选择交易');
+        return;
+    }
+    
+    selectedTrade = trades.find(t => t.id == tradeId);
+    if (!selectedTrade) {
+        showError('未找到选中的交易');
+        return;
+    }
+    
+    // 查找对应的开仓/平仓交易
+    const isClose = selectedTrade.action === 'CLOSE_LONG' || selectedTrade.action === 'CLOSE_SHORT';
+    const openAction = isClose ? 
+        (selectedTrade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT') :
+        (selectedTrade.action === 'OPEN_LONG' ? 'CLOSE_LONG' : 'CLOSE_SHORT');
+    
+    const relatedTrade = trades.find(t => 
+        t.security_info?.symbol === selectedTrade.security_info?.symbol &&
+        t.action === openAction &&
+        parseFloat(t.quantity) === parseFloat(selectedTrade.quantity) &&
+        new Date(t.traded_at) < new Date(selectedTrade.traded_at)
+    );
+    
+    // 计算盈亏
+    let pnl = parseFloat(selectedTrade.realized_pnl || 0);
+    if (isClose && pnl === 0 && relatedTrade) {
+        const openPrice = parseFloat(relatedTrade.price);
+        const closePrice = parseFloat(selectedTrade.price);
+        const quantity = parseFloat(selectedTrade.quantity);
+        
+        if (selectedTrade.action === 'CLOSE_LONG') {
+            pnl = (closePrice - openPrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(relatedTrade.fee || 0);
+        } else {
+            pnl = (openPrice - closePrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(relatedTrade.fee || 0);
+        }
+    }
+    
+    const isProfit = pnl >= 0;
+    const symbol = selectedTrade.security_info?.symbol || '未知代码';
+    const name = selectedTrade.security_info?.name || '股票名称';
+    
+    // 创建交易笔记HTML
+    const noteHTML = `
+        <div class="trade-note" style="width: 1080px; min-height: 2400px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 50px; font-family: 'Microsoft YaHei', sans-serif; color: white; position: relative; overflow: hidden;">
+            <!-- 背景装饰 -->
+            <div style="position: absolute; top: -100px; right: -100px; width: 400px; height: 400px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+            <div style="position: absolute; bottom: -100px; left: -100px; width: 300px; height: 300px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+            
+            <!-- 标题 -->
+            <div style="text-align: center; margin-bottom: 50px;">
+                <h1 style="font-size: 72px; font-weight: 900; margin-bottom: 20px; text-shadow: 0 4px 20px rgba(0,0,0,0.3);">📊 交易笔记</h1>
+                <div style="font-size: 48px; opacity: 0.9;">${symbol} - ${name}</div>
+            </div>
+            
+            <!-- 交易概览 -->
+            <div style="background: rgba(255,255,255,0.15); border-radius: 30px; padding: 35px; margin-bottom: 30px; backdrop-filter: blur(20px); border: 2px solid rgba(255,255,255,0.3);">
+                <h2 style="font-size: 48px; margin-bottom: 25px; text-align: center;">💰 交易概览</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 36px;">
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">股票代码</div>
+                        <div style="font-weight: bold; font-size: 42px;">${symbol}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">股票名称</div>
+                        <div style="font-weight: bold; font-size: 42px;">${name}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">最终获利</div>
+                        <div style="font-weight: bold; font-size: 48px; color: ${isProfit ? '#00ff88' : '#ff6b6b'};">
+                            ${isProfit ? '+' : ''}${pnl.toFixed(2)} 港元
+                        </div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">收益率</div>
+                        <div style="font-weight: bold; font-size: 48px; color: ${isProfit ? '#00ff88' : '#ff6b6b'};">
+                            ${isProfit ? '+' : ''}${(pnl / (parseFloat(selectedTrade.price) * parseFloat(selectedTrade.quantity)) * 100).toFixed(2)}%
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 开仓信息 -->
+            <div style="background: rgba(255,255,255,0.15); border-radius: 30px; padding: 35px; margin-bottom: 30px; backdrop-filter: blur(20px); border: 2px solid rgba(255,255,255,0.3);">
+                <h2 style="font-size: 48px; margin-bottom: 25px; text-align: center;">📈 开仓信息</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 36px;">
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">买入价格</div>
+                        <div style="font-weight: bold; font-size: 42px;">${relatedTrade ? parseFloat(relatedTrade.price).toFixed(3) : 'N/A'}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">买入数量</div>
+                        <div style="font-weight: bold; font-size: 42px;">${relatedTrade ? relatedTrade.quantity : 'N/A'}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">买入金额</div>
+                        <div style="font-weight: bold; font-size: 42px;">${relatedTrade ? (parseFloat(relatedTrade.price) * parseFloat(relatedTrade.quantity)).toFixed(2) : 'N/A'}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">开仓时间</div>
+                        <div style="font-weight: bold; font-size: 32px;">${relatedTrade ? new Date(relatedTrade.traded_at).toLocaleString('zh-CN') : 'N/A'}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 30px;">
+                    <div style="color: rgba(255,255,255,0.7); margin-bottom: 15px; font-size: 32px;">开仓备注</div>
+                    <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 15px; font-size: 28px; line-height: 1.6;">
+                        ${relatedTrade && relatedTrade.notes ? relatedTrade.notes : '暂无备注'}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 平仓信息 -->
+            <div style="background: rgba(255,255,255,0.15); border-radius: 30px; padding: 35px; margin-bottom: 30px; backdrop-filter: blur(20px); border: 2px solid rgba(255,255,255,0.3);">
+                <h2 style="font-size: 48px; margin-bottom: 25px; text-align: center;">${isProfit ? '📈' : '📉'} 平仓信息</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; font-size: 36px;">
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">卖出价格</div>
+                        <div style="font-weight: bold; font-size: 42px;">${parseFloat(selectedTrade.price).toFixed(3)}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">卖出数量</div>
+                        <div style="font-weight: bold; font-size: 42px;">${selectedTrade.quantity}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">卖出金额</div>
+                        <div style="font-weight: bold; font-size: 42px;">${(parseFloat(selectedTrade.price) * parseFloat(selectedTrade.quantity)).toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <div style="color: rgba(255,255,255,0.7); margin-bottom: 10px;">平仓时间</div>
+                        <div style="font-weight: bold; font-size: 32px;">${new Date(selectedTrade.traded_at).toLocaleString('zh-CN')}</div>
+                    </div>
+                </div>
+                <div style="margin-top: 30px;">
+                    <div style="color: rgba(255,255,255,0.7); margin-bottom: 15px; font-size: 32px;">平仓备注</div>
+                    <div style="background: rgba(0,0,0,0.2); padding: 20px; border-radius: 15px; font-size: 28px; line-height: 1.6;">
+                        ${selectedTrade.notes || '暂无备注'}
+                    </div>
+                </div>
+            </div>
+            
+                        
+            <!-- 底部信息 -->
+            <div style="text-align: center; margin-top: 30px; opacity: 0.7; font-size: 24px;">
+                <div>生成时间：${new Date().toLocaleString('zh-CN')}</div>
+                <div style="margin-top: 8px;">📊 Stocks-Lab 交易管理系统</div>
+            </div>
+        </div>
+    `;
+    
+    // 渲染到隐藏的容器
+    const noteCanvas = document.getElementById('share-canvas');
+    noteCanvas.innerHTML = noteHTML;
+    noteCanvas.style.display = 'block';
+    
+    try {
+        // 生成图片
+        const canvas = await html2canvas(noteCanvas.firstElementChild, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+            width: 1080,
+            height: 2400
+        });
+        
+        // 隐藏canvas
+        noteCanvas.style.display = 'none';
+        
+        // 显示预览
+        const preview = document.getElementById('preview-image');
+        preview.innerHTML = `
+            <img src="${canvas.toDataURL('image/png')}" 
+                 style="width: 100%; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-primary" onclick="downloadNote('${canvas.toDataURL('image/png')}')">
+                    💾 下载交易笔记
+                </button>
+            </div>
+        `;
+        
+        showSuccess('交易笔记生成成功！');
+        
+    } catch (error) {
+        console.error('Failed to generate note:', error);
+        showError('生成交易笔记失败: ' + error.message);
+    }
+}
+
+// 下载笔记
+function downloadNote(dataUrl) {
+    const link = document.createElement('a');
+    link.download = `交易笔记-${new Date().getTime()}.png`;
+    link.href = dataUrl;
+    link.click();
+}
+
+// 页面加载完成后执行
+document.addEventListener('DOMContentLoaded', () => {
+    loadTrades();
+});
+</script>
+
+{% endblock %}

@@ -232,6 +232,22 @@ class SecurityViewSet(viewsets.ModelViewSet):
             'symbol': security.symbol,
             'name': security.name
         })
+    
+    def perform_update(self, serializer):
+        # 安全检查：确保用户只能更新自己账户下的标的
+        security = serializer.save()
+        create_audit_log('UPDATE', 'Security', security.id, self.request.user, {
+            'symbol': security.symbol,
+            'name': security.name
+        })
+    
+    def perform_destroy(self, instance):
+        # 记录删除前的信息
+        create_audit_log('DELETE', 'Security', instance.id, self.request.user, {
+            'symbol': instance.symbol,
+            'name': instance.name
+        })
+        instance.delete()
 
 
 class TradeViewSet(viewsets.ModelViewSet):

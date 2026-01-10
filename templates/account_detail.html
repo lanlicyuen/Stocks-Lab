@@ -21,8 +21,11 @@
                 <span class="badge badge-primary" id="marketTypeBadge"></span>
             </div>
             <div style="display: flex; gap: 10px;" id="actionButtons">
-                <a href="/accounts/{{ account_id }}/securities/new/" class="btn btn-success btn-sm">
-                    + <span id="btn-add-security">新增股票</span>
+                <a href="/accounts/{{ account_id }}/edit/" class="btn btn-sm" style="background: #6c757d; color: white;">
+                    ✏️ <span id="btn-edit-account">编辑</span>
+                </a>
+                <a href="/accounts/{{ account_id }}/securities/manage/" class="btn btn-info btn-sm" style="background: #17a2b8; color: white;">
+                    📊 <span id="btn-manage-securities">管理股票</span>
                 </a>
                 <a href="/accounts/{{ account_id }}/trades/new/" class="btn btn-primary btn-sm">
                     + <span id="btn-add-trade">新增交易</span>
@@ -104,7 +107,7 @@
 </div>
 
 <!-- Current Positions -->
-<div class="card">
+<div class="card" id="positionsCard">
     <div class="card-header">
         <h2 class="card-title">📊 当前持仓</h2>
     </div>
@@ -119,10 +122,15 @@
 </div>
 
 <!-- Trade Records -->
-<div class="card">
+<div class="card" id="tradesCard">
     <div class="card-header">
         <h2 class="card-title">💹 交易记录</h2>
-        <button id="viewAllTradesBtn" class="btn btn-secondary btn-sm" onclick="toggleAllTrades()">展开全部</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-sm" style="background: #28a745; color: white;" onclick="window.location.href='/accounts/{{ account_id }}/trades/share/'">
+                📸 导出图片
+            </button>
+            <button id="viewAllTradesBtn" class="btn btn-secondary btn-sm" onclick="toggleAllTrades()">展开全部</button>
+        </div>
     </div>
     <div class="card-body">
         <div id="tradeRecords">
@@ -1247,6 +1255,157 @@ async function deleteAccount() {
         console.error('Failed to delete account:', error);
         alert(`${t('delete_failed')}` + (error.message || '请重试'));
     }
+}
+
+// Export positions as image
+async function exportPositions() {
+    const card = document.getElementById('positionsCard');
+    if (!card) return;
+    
+    try {
+        // Load html2canvas library if not loaded
+        if (typeof html2canvas === 'undefined') {
+            await loadHtml2Canvas();
+        }
+        
+        // Create a clone for export
+        const clone = card.cloneNode(true);
+        clone.style.position = 'absolute';
+        clone.style.left = '-9999px';
+        clone.style.width = '1200px';
+        clone.style.background = 'white';
+        document.body.appendChild(clone);
+        
+        // Remove export button from clone
+        const exportBtn = clone.querySelector('button[onclick="exportPositions()"]');
+        if (exportBtn) exportBtn.remove();
+        
+        // Generate canvas
+        const canvas = await html2canvas(clone, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            width: 1200,
+            height: 800
+        });
+        
+        // Add watermark
+        const ctx = canvas.getContext('2d');
+        ctx.font = '16px Arial';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.textAlign = 'right';
+        const watermarkText = `Stocks-Lab | ${new Date().toLocaleString('zh-CN')}`;
+        ctx.fillText(watermarkText, canvas.width - 20, canvas.height - 20);
+        
+        // Download image
+        const link = document.createElement('a');
+        const accountName = (accountData && accountData.name) ? accountData.name : '账户';
+        link.download = `持仓-${accountName}-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(clone);
+        
+        showSuccess('持仓图片已导出');
+    } catch (error) {
+        console.error('Export failed:', error);
+        showError('导出失败: ' + error.message);
+    }
+}
+
+// Export trades as image
+async function exportTrades() {
+    const card = document.getElementById('tradesCard');
+    if (!card) return;
+    
+    try {
+        // Load html2canvas library if not loaded
+        if (typeof html2canvas === 'undefined') {
+            await loadHtml2Canvas();
+        }
+        
+        // Create a clone for export
+        const clone = card.cloneNode(true);
+        clone.style.position = 'absolute';
+        clone.style.left = '-9999px';
+        clone.style.width = '1200px';
+        clone.style.background = 'white';
+        document.body.appendChild(clone);
+        
+        // Remove export buttons from clone
+        const exportBtn = clone.querySelector('button[onclick="exportTrades()"]');
+        if (exportBtn) exportBtn.remove();
+        const viewAllBtn = clone.querySelector('#viewAllTradesBtn');
+        if (viewAllBtn) viewAllBtn.remove();
+        
+        // Generate canvas
+        const canvas = await html2canvas(clone, {
+            backgroundColor: '#ffffff',
+            scale: 2,
+            logging: false,
+            width: 1200,
+            height: 1600
+        });
+        
+        // Add watermark
+        const ctx = canvas.getContext('2d');
+        ctx.font = '16px Arial';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.textAlign = 'right';
+        const watermarkText = `Stocks-Lab | ${new Date().toLocaleString('zh-CN')}`;
+        ctx.fillText(watermarkText, canvas.width - 20, canvas.height - 20);
+        
+        // Download image
+        const link = document.createElement('a');
+        const accountName = (accountData && accountData.name) ? accountData.name : '账户';
+        link.download = `交易记录-${accountName}-${new Date().toISOString().split('T')[0]}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(clone);
+        
+        showSuccess('交易记录图片已导出');
+    } catch (error) {
+        console.error('Export failed:', error);
+        showError('导出失败: ' + error.message);
+    }
+}
+
+// Load html2canvas library dynamically
+function loadHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+    });
+}
+
+// Show success message
+function showSuccess(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '✅ ' + message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
+}
+
+// Show error message
+function showError(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '❌ ' + message;
+    document.body.appendChild(toast);
+    
+    setTimeout(() => {
+        toast.remove();
+    }, 3000);
 }
 
 // Initialize

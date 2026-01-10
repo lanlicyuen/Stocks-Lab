@@ -591,7 +591,7 @@
     {% endif %}
     
     <script>
-        // Global API helper
+        // API 工具类
         const API = {
             baseURL: '/api/v1',
             
@@ -677,6 +677,10 @@
                     }
                 }
                 return cookieValue;
+            },
+            
+            getCsrfToken() {
+                return this.getCookie('csrftoken');
             }
         };
         

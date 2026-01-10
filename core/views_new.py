@@ -54,3 +54,43 @@ def trade_form_view(request, account_id):
     }
     
     return render(request, 'trade_form.html', context)
+
+
+@login_required
+def account_edit_view(request, pk):
+    """账户编辑页面"""
+    return render(request, 'account_edit.html', {
+        'account_id': pk
+    })
+
+
+@login_required
+def securities_manage_view(request, account_id):
+    """股票管理页面"""
+    return render(request, 'securities_manage.html', {
+        'account_id': account_id
+    })
+
+
+@login_required
+def debug_securities_view(request, account_id):
+    """调试股票管理页面"""
+    return render(request, 'debug_securities.html', {
+        'account_id': account_id
+    })
+
+
+@login_required
+def position_share_view(request, account_id):
+    """持仓分享页面"""
+    return render(request, 'position_share.html', {
+        'account_id': account_id
+    })
+
+
+@login_required
+def trade_share_view(request, account_id):
+    """交易分享页面"""
+    return render(request, 'trade_share.html', {
+        'account_id': account_id
+    })

@@ -1,0 +1,467 @@
+{% extends 'base_new.html' %}
+
+{% block title %}持仓分享 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span>首页</span></a>
+    <a href="/accounts/"><span>账户列表</span></a>
+    <a href="/accounts/{{ account_id }}/"><span>账户详情</span></a>
+    <a href="#" class="active"><span>持仓分享</span></a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">📸 生成分享图</h2>
+        <button class="btn btn-primary" onclick="generateShareImage()">生成图片</button>
+    </div>
+    <div class="card-body">
+        <!-- 预览区域 -->
+        <div id="preview-container" style="max-width: 540px; margin: 0 auto;">
+            <div id="share-canvas" style="display: none;">
+                <!-- 这个div会被转换成图片 -->
+            </div>
+            <div id="preview-image"></div>
+        </div>
+    </div>
+</div>
+
+<style>
+.share-image {
+    width: 1080px;
+    height: 1920px;
+    position: relative;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    overflow: hidden;
+}
+
+.share-bg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #00C853 0%, #00E676 100%);
+}
+
+.share-bg.loss {
+    background: linear-gradient(135deg, #F44336 0%, #FF5252 100%);
+}
+
+.watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-30deg);
+    font-size: 120px;
+    font-weight: 900;
+    color: rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    pointer-events: none;
+    letter-spacing: 20px;
+}
+
+.share-header {
+    position: absolute;
+    top: 60px;
+    left: 60px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.platform-logo {
+    font-size: 48px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.pnl-section {
+    position: absolute;
+    top: 200px;
+    left: 0;
+    right: 0;
+    text-align: center;
+}
+
+.pnl-label {
+    display: inline-block;
+    padding: 12px 40px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 30px;
+    font-size: 32px;
+    color: white;
+    margin-bottom: 30px;
+    backdrop-filter: blur(10px);
+}
+
+.pnl-value {
+    font-size: 160px;
+    font-weight: 900;
+    color: white;
+    text-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    line-height: 1;
+    margin-bottom: 20px;
+}
+
+.pnl-percent {
+    font-size: 100px;
+}
+
+.mascot-container {
+    position: absolute;
+    top: 550px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mascot-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 30px rgba(0,0,0,0.3));
+}
+
+.mascot-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.placeholder-content {
+    text-align: center;
+    background: rgba(255, 255, 255, 0.15);
+    border: 4px dashed rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    width: 400px;
+    height: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(10px);
+}
+
+.placeholder-icon {
+    font-size: 180px;
+    line-height: 1;
+    margin-bottom: 20px;
+    filter: drop-shadow(0 5px 15px rgba(0,0,0,0.2));
+}
+
+.placeholder-text {
+    font-size: 48px;
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+}
+
+.stock-info {
+    position: absolute;
+    bottom: 350px;
+    left: 60px;
+    right: 60px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 30px;
+    padding: 50px;
+    backdrop-filter: blur(20px);
+}
+
+.stock-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.stock-left {
+    flex: 1;
+}
+
+.stock-code {
+    font-size: 32px;
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.stock-name {
+    font-size: 56px;
+    font-weight: 700;
+    color: #333;
+}
+
+.stock-right {
+    text-align: right;
+}
+
+.price-label {
+    font-size: 28px;
+    color: #999;
+    margin-bottom: 8px;
+}
+
+.price-value {
+    font-size: 64px;
+    font-weight: 700;
+    color: #333;
+}
+
+.avg-cost {
+    margin-top: 30px;
+}
+
+.footer-info {
+    position: absolute;
+    bottom: 80px;
+    left: 60px;
+    right: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-name {
+    font-size: 36px;
+    color: white;
+    font-weight: 500;
+}
+
+.share-date {
+    font-size: 32px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.qrcode-container {
+    position: absolute;
+    bottom: 60px;
+    right: 60px;
+    width: 150px;
+    height: 150px;
+    background: white;
+    border-radius: 15px;
+    padding: 10px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.qrcode-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.btn {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script>
+const accountId = {{ account_id }};
+let accountData = null;
+let positionData = null;
+
+// 加载账户数据
+async function loadAccountData() {
+    try {
+        accountData = await API.get(`/accounts/${accountId}/`);
+        console.log('Account data:', accountData);
+    } catch (error) {
+        console.error('Failed to load account:', error);
+        showError('加载账户数据失败');
+    }
+}
+
+// 生成分享图
+async function generateShareImage() {
+    if (!accountData) {
+        await loadAccountData();
+    }
+    
+    if (!accountData) {
+        showError('无法加载账户数据');
+        return;
+    }
+    
+    // 获取持仓数据
+    const positions = accountData.positions || [];
+    if (positions.length === 0) {
+        showError('暂无持仓数据');
+        return;
+    }
+    
+    // 使用第一个持仓
+    positionData = positions[0];
+    
+    // 计算盈亏
+    const currentPrice = positionData.long_avg_cost || 0; // 这里应该是实时价格，暂用成本价
+    const avgCost = positionData.long_avg_cost || 0;
+    const pnlPercent = avgCost > 0 ? ((currentPrice - avgCost) / avgCost * 100) : 0;
+    const isProfit = pnlPercent >= 0;
+    
+    // 创建分享图HTML
+    const shareHTML = `
+        <div class="share-image">
+            <div class="share-bg ${isProfit ? '' : 'loss'}"></div>
+            
+            <!-- 背景水印 -->
+            <div class="watermark">1PLABS PRO</div>
+            
+            <!-- 平台Logo -->
+            <div class="share-header">
+                <div class="platform-logo">📊 Stocks-Lab</div>
+            </div>
+            
+            <!-- 盈亏百分比 -->
+            <div class="pnl-section">
+                <div class="pnl-label">% Unrealized P/L</div>
+                <div class="pnl-value">
+                    ${isProfit ? '+' : ''}${pnlPercent.toFixed(2)}<span class="pnl-percent">%</span>
+                </div>
+            </div>
+            
+            <!-- 卡通人物 -->
+            <div class="mascot-container">
+                <img src="/static/images/mascot.png" alt="Mascot" class="mascot-image" 
+                     onerror="this.style.display='none'; this.parentElement.querySelector('.mascot-placeholder').style.display='flex';">
+                <div class="mascot-placeholder" style="display: none;">
+                    <div class="placeholder-content">
+                        <div class="placeholder-icon">👑</div>
+                        <div class="placeholder-text">Mascot</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 股票信息 -->
+            <div class="stock-info">
+                <div class="stock-row">
+                    <div class="stock-left">
+                        <div class="stock-code">${positionData.symbol || '00100'}</div>
+                        <div class="stock-name">${positionData.name || 'Stock Name'}</div>
+                    </div>
+                    <div class="stock-right">
+                        <div class="price-label">Price</div>
+                        <div class="price-value">${currentPrice.toFixed(3)}</div>
+                    </div>
+                </div>
+                <div class="stock-row avg-cost">
+                    <div class="stock-left"></div>
+                    <div class="stock-right">
+                        <div class="price-label">Avg Cost</div>
+                        <div class="price-value">${avgCost.toFixed(3)}</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 底部信息 -->
+            <div class="footer-info">
+                <div class="user-name">${accountData.name || 'User'}</div>
+                <div class="share-date">${new Date().toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})} ${new Date().toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})}</div>
+            </div>
+            
+            <!-- 二维码位置预留 -->
+            <!-- <div class="qrcode-container">
+                <img src="/path/to/qrcode.png" alt="QR Code" style="width: 150px; height: 150px;">
+            </div> -->
+        </div>
+    `;
+    
+    // 渲染到隐藏的canvas
+    const canvas = document.getElementById('share-canvas');
+    canvas.innerHTML = shareHTML;
+    canvas.style.display = 'block';
+    
+    // 等待图片加载
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // 使用html2canvas生成图片
+    try {
+        const canvasElement = await html2canvas(canvas, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+            width: 1080,
+            height: 1920
+        });
+        
+        // 隐藏canvas
+        canvas.style.display = 'none';
+        
+        // 显示预览
+        const preview = document.getElementById('preview-image');
+        preview.innerHTML = `
+            <img src="${canvasElement.toDataURL('image/png')}" 
+                 style="width: 100%; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.2);">
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-primary" onclick="downloadImage('${canvasElement.toDataURL('image/png')}')">
+                    💾 下载图片
+                </button>
+            </div>
+        `;
+        
+        showSuccess('图片生成成功！');
+        
+    } catch (error) {
+        console.error('Failed to generate image:', error);
+        showError('生成图片失败: ' + error.message);
+    }
+}
+
+// 下载图片
+function downloadImage(dataUrl) {
+    const link = document.createElement('a');
+    link.download = `持仓分享-${new Date().getTime()}.png`;
+    link.href = dataUrl;
+    link.click();
+}
+
+// Toast提示
+function showError(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #dc3545; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '❌ ' + message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+function showSuccess(message) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10000;';
+    toast.textContent = '✅ ' + message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    loadAccountData();
+});
+</script>
+
+{% endblock %}

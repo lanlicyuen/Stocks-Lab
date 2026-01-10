@@ -1,0 +1,138 @@
+{% extends 'base_new.html' %}
+
+{% block title %}调试股票管理 - 投资项目披露平台{% endblock %}
+
+{% block content %}
+<div class="desktop-nav">
+    <a href="{% url 'dashboard' %}"><span id="nav-home">首页</span></a>
+    <a href="/accounts/"><span id="nav-account-list">账户列表</span></a>
+    <a href="/accounts/{{ account_id }}/"><span id="nav-account-detail">账户详情</span></a>
+    <a href="#" class="active"><span id="nav-debug-securities">调试股票管理</span></a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h2 class="card-title">🔍 调试股票管理</h2>
+    </div>
+    <div class="card-body">
+        <div id="debugInfo">
+            <h3>调试信息</h3>
+            <p><strong>账户ID:</strong> {{ account_id }}</p>
+            <p><strong>API基础URL:</strong> /api/v1</p>
+            <p><strong>完整API URL:</strong> /api/v1/securities/?account={{ account_id }}</p>
+            
+            <button class="btn btn-primary" onclick="testAPI()">测试API</button>
+            <button class="btn btn-secondary" onclick="testAccounts()">测试账户API</button>
+            <button class="btn btn-info" onclick="testAllSecurities()">测试所有股票</button>
+            
+            <div id="testResults" style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 5px;">
+                <h4>测试结果:</h4>
+                <div id="results">点击按钮开始测试...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 5px;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-info {
+    background: #17a2b8;
+    color: white;
+}
+
+#results {
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+</style>
+
+<script>
+let accountId = {{ account_id }};
+
+function log(message) {
+    const results = document.getElementById('results');
+    results.textContent += new Date().toLocaleTimeString() + ': ' + message + '\n';
+}
+
+async function testAPI() {
+    log('开始测试股票API...');
+    log('请求URL: /api/v1/securities/?account=' + accountId);
+    
+    try {
+        log('检查API对象...');
+        if (typeof API === 'undefined') {
+            log('❌ API对象未定义');
+            return;
+        }
+        log('✅ API对象已定义');
+        
+        log('发送请求...');
+        const response = await API.get(`/securities/?account=${accountId}`);
+        log('✅ 请求成功');
+        log('响应数据: ' + JSON.stringify(response, null, 2));
+        
+    } catch (error) {
+        log('❌ 请求失败');
+        log('错误类型: ' + error.constructor.name);
+        log('错误信息: ' + error.message);
+        log('错误详情: ' + JSON.stringify(error, null, 2));
+    }
+}
+
+async function testAccounts() {
+    log('开始测试账户API...');
+    
+    try {
+        const response = await API.get(`/accounts/${accountId}/`);
+        log('✅ 账户API成功');
+        log('账户数据: ' + JSON.stringify(response, null, 2));
+    } catch (error) {
+        log('❌ 账户API失败');
+        log('错误: ' + error.message);
+    }
+}
+
+async function testAllSecurities() {
+    log('开始测试所有股票API（不指定账户）...');
+    
+    try {
+        const response = await API.get('/securities/');
+        log('✅ 所有股票API成功');
+        log('股票数量: ' + response.length);
+        log('股票数据: ' + JSON.stringify(response, null, 2));
+    } catch (error) {
+        log('❌ 所有股票API失败');
+        log('错误: ' + error.message);
+    }
+}
+
+// 初始化
+document.addEventListener('DOMContentLoaded', () => {
+    log('页面加载完成');
+    log('账户ID: ' + accountId);
+    log('开始调试...');
+});
+</script>
+
+{% endblock %}

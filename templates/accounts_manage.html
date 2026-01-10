@@ -289,6 +289,7 @@ async function loadAccounts() {
                             <span class="badge badge-${modeColor}" style="margin-left: 10px;">${modeText}</span>
                         </div>
                         <div class="account-actions">
+                            <a href="/accounts/${acc.id}/edit/" class="btn btn-secondary btn-sm">编辑</a>
                             <a href="/accounts/${acc.id}/" class="btn btn-primary btn-sm">查看详情</a>
                             <button class="btn btn-danger btn-sm" onclick="showDeleteModal(${acc.id}, '${acc.name || acc.market_type_display}')">
                                 删除
