@@ -76,6 +76,46 @@ def logout_view(request):
     }, status=status.HTTP_200_OK)
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def change_password(request):
+    """修改密码"""
+    from django.contrib.auth import authenticate
+    
+    old_password = request.data.get('old_password')
+    new_password = request.data.get('new_password')
+    
+    if not old_password or not new_password:
+        return Response({
+            'error': '旧密码和新密码不能为空'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 验证旧密码
+    user = authenticate(username=request.user.username, password=old_password)
+    if user is None:
+        return Response({
+            'error': '当前密码错误'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 验证新密码长度
+    if len(new_password) < 8:
+        return Response({
+            'error': '新密码长度至少为 8 位'
+        }, status=status.HTTP_400_BAD_REQUEST)
+    
+    # 修改密码
+    request.user.set_password(new_password)
+    request.user.save()
+    
+    # 登出用户，要求重新登录
+    django_logout(request)
+    
+    return Response({
+        'success': True,
+        'message': '密码修改成功，请重新登录'
+    }, status=status.HTTP_200_OK)
+
+
 urlpatterns = [
     # 用户相关
     path('me/', me, name='me'),
@@ -86,6 +126,9 @@ urlpatterns = [
     
     # Session 登出（Web 端）
     path('auth/logout/', logout_view, name='api-logout'),
+    
+    # 密码修改
+    path('auth/change-password/', change_password, name='change-password'),
     
     # RESTful endpoints
     path('', include(router.urls)),

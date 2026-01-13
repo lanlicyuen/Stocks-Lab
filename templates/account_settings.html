@@ -113,18 +113,22 @@ async function changePassword(event) {
     }
     
     try {
-        // Note: This endpoint needs to be implemented in backend
-        showInfo('密码修改功能待实现，请联系管理员');
+        const response = await API.post('/auth/change-password/', {
+            old_password: oldPassword,
+            new_password: newPassword
+        });
         
-        // When implemented:
-        // await API.post('/auth/change-password/', {
-        //     old_password: oldPassword,
-        //     new_password: newPassword
-        // });
-        // showSuccess('密码修改成功，请重新登录');
-        // setTimeout(() => logout(), 2000);
+        showSuccess('密码修改成功，请重新登录');
+        
+        // 清空表单
+        document.getElementById('changePasswordForm').reset();
+        
+        // 2秒后跳转到登录页
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 2000);
     } catch (error) {
-        showError('修改失败：' + error.message);
+        showError(error.message || '修改失败，请重试');
     }
 }
 
