@@ -1,8 +1,19 @@
 # Stocks-Lab - 投资项目只读披露平台
 
+[![中文界面](screenshots/CHs.png)](screenshots/CHs.png)
+[![English Interface](screenshots/Eng.png)](screenshots/Eng.png)
+
 **中文** | [English](#stocks-lab---investment-portfolio-disclosure-platform)
 
-这是一个基于 Django + Django REST Framework 的投资项目披露平台，支持项目管理、出资记录、日结余记录、交易记录等功能。采用 Mobile-first 响应式设计，支持电脑和手机浏览。
+这是一个基于 Django + Django REST Framework 的投资项目披露平台，专为投资者设计，提供完整的交易记录管理、盈亏分析、分享导出等功能。采用 Mobile-first 响应式设计，完美适配桌面和移动设备。
+
+## 🌟 主要亮点
+
+- **📊 撮合交易智能识别** - 自动匹配开仓和平仓记录，显示完整交易对信息
+- **📸 交易分享功能** - 生成富途风格的交易分享图片，支持自定义布局和二维码
+- **📝 交易笔记导出** - 导出详细的交易笔记，包含开仓和平仓的完整信息
+- **📱 响应式设计** - 完美适配手机、平板和桌面设备
+- **🌐 多语言支持** - 中英文界面切换，满足不同用户需求
 
 ## 功能特性
 
@@ -365,9 +376,20 @@ A: 检查 `media/` 目录权限，确保 Django 进程有写入权限。
 
 # Stocks-Lab - Investment Portfolio Disclosure Platform
 
+[![Chinese Interface](screenshots/CHs.png)](screenshots/CHs.png)
+[![English Interface](screenshots/Eng.png)](screenshots/Eng.png)
+
 [中文](#stocks-lab---投资项目只读披露平台) | **English**
 
-An investment portfolio disclosure platform based on Django + Django REST Framework, supporting project management, contribution records, daily balance tracking, and trade logging. Features mobile-first responsive design for both desktop and mobile viewing. **Now with full internationalization support (Chinese/English).**
+An investment portfolio disclosure platform based on Django + Django REST Framework, specifically designed for investors to manage trading records, analyze profits/losses, and export/share trading information. Features mobile-first responsive design that perfectly adapts to desktop and mobile devices. **Now with full internationalization support (Chinese/English).**
+
+## 🌟 Key Highlights
+
+- **📊 Smart Trade Matching** - Automatically matches opening and closing trades, displaying complete trade pair information
+- **📸 Trade Sharing Feature** - Generate Futu-style trading share images with customizable layouts and QR codes
+- **📝 Trade Note Export** - Export detailed trading notes with complete opening and closing information
+- **📱 Responsive Design** - Perfect adaptation for mobile, tablet, and desktop devices
+- **🌐 Internationalization** - Full Chinese/English UI with language switcher
 
 ## Features
 
@@ -378,6 +400,10 @@ An investment portfolio disclosure platform based on Django + Django REST Framew
 - **Position Tracking**: Real-time position monitoring with P&L calculation
 - **Order Management**: Pending orders with status tracking (PENDING/FILLED/CANCELLED)
 - **Cash Adjustments**: Track deposits, withdrawals, fees, and interest
+- **Matched Trades**: Intelligent identification of opening/closing trade pairs
+- **Trade Sharing**: Generate Futu-style trading share images with custom layouts
+- **Trade Notes Export**: Export detailed trading notes with complete information
+- **Position Sharing**: Generate position overview with QR code integration
 - **Attachment Support**: Add images to trades and daily balances
 - **Audit Logs**: Automatic logging of all key operations
 - **🌐 Internationalization**: Full Chinese/English UI with language switcher
