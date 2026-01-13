@@ -75,29 +75,6 @@
         .role-admin { background: var(--danger-color); }
         .role-viewer { background: var(--primary-color); }
         
-        /* Language buttons */
-        .lang-btn-nav {
-            padding: 4px 8px;
-            border: 1px solid rgba(255,255,255,0.3);
-            background: transparent;
-            color: white;
-            border-radius: 4px;
-            font-size: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .lang-btn-nav:hover {
-            background: rgba(255,255,255,0.2);
-            border-color: rgba(255,255,255,0.5);
-        }
-        
-        .lang-btn-nav.active {
-            background: rgba(255,255,255,0.3);
-            border-color: rgba(255,255,255,0.6);
-            font-weight: 600;
-        }
-        
         /* User Dropdown */
         .user-dropdown {
             position: absolute;
@@ -606,21 +583,15 @@
     <div class="header">
         <div class="header-content">
             <h1>📊 <span id="site-title">投资披露平台</span></h1>
-            <div style="display: flex; align-items: center; gap: 15px;">
-                <div style="display: flex; gap: 5px;">
-                    <button class="lang-btn-nav" id="lang-zh" onclick="setLanguage('zh-hans')">中文</button>
-                    <button class="lang-btn-nav" id="lang-en" onclick="setLanguage('en')">EN</button>
-                </div>
-                <div class="user-badge {% if user_role == 'ADMIN' %}role-admin{% else %}role-viewer{% endif %}" onclick="toggleUserDropdown()">
-                    <span>{{ user.username }}</span>
-                    {% if user_role %}
-                    <span>({{ user_role }})</span>
-                    {% endif %}
-                    <span style="margin-left:4px;">▼</span>
-                    <div class="user-dropdown" id="userDropdown">
-                        <a href="/account">⚙️ <span id="account-settings">账号管理</span></a>
-                        <a href="#" onclick="logout(event)">🚪 <span id="logout-menu">登出</span></a>
-                    </div>
+            <div class="user-badge {% if user_role == 'ADMIN' %}role-admin{% else %}role-viewer{% endif %}" onclick="toggleUserDropdown()">
+                <span>{{ user.username }}</span>
+                {% if user_role %}
+                <span>({{ user_role }})</span>
+                {% endif %}
+                <span style="margin-left:4px;">▼</span>
+                <div class="user-dropdown" id="userDropdown">
+                    <a href="/account">⚙️ <span id="account-settings">账号管理</span></a>
+                    <a href="#" onclick="logout(event)">🚪 <span id="logout-menu">登出</span></a>
                 </div>
             </div>
         </div>
@@ -903,29 +874,7 @@
             }
         }
         
-        // Language switching function
-        function setLanguage(lang) {
-            localStorage.setItem('language', lang);
-            
-            // Update button states
-            document.getElementById('lang-zh').classList.toggle('active', lang === 'zh-hans');
-            document.getElementById('lang-en').classList.toggle('active', lang === 'en');
-            
-            // Apply translations
-            applyBaseTranslations();
-            applyFooterTranslations();
-            
-            // Trigger page-specific translation if available
-            if (typeof applyTranslations === 'function') {
-                applyTranslations();
-            }
-            
-            // Reload page to ensure all elements are translated
-            setTimeout(() => {
-                window.location.reload();
-            }, 100);
-        }
-        
+                
         // Apply footer translations
         function applyFooterTranslations() {
             const lang = localStorage.getItem('language') || 'zh-hans';
@@ -941,11 +890,6 @@
         
         // Apply translations when page loads
         document.addEventListener('DOMContentLoaded', function() {
-            // Set initial language button state
-            const lang = localStorage.getItem('language') || 'zh-hans';
-            document.getElementById('lang-zh').classList.toggle('active', lang === 'zh-hans');
-            document.getElementById('lang-en').classList.toggle('active', lang === 'en');
-            
             applyBaseTranslations();
             applyFooterTranslations();
         });
