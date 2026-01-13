@@ -919,6 +919,13 @@
         
         // Apply translations when page loads
         document.addEventListener('DOMContentLoaded', function() {
+            // Force set correct title immediately
+            const siteTitleEl = document.getElementById('site-title');
+            if (siteTitleEl) {
+                const lang = localStorage.getItem('language') || 'zh-hans';
+                siteTitleEl.textContent = lang === 'zh-hans' ? '投资披露平台' : 'Investment Disclosure Platform';
+            }
+            
             applyBaseTranslations();
             applyFooterTranslations();
         });
