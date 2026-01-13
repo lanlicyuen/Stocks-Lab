@@ -97,9 +97,35 @@ cd frontend && npm run dev
 
 测试账户（运行 `create_test_data.py` 后）：
 - 管理员: `admin` / `admin123`
+
+### 5. 管理员密码修改
+
+**方法一：使用脚本（推荐）**
+```bash
+# 修改密码
+./change_admin_password.sh 新密码
+
+# 示例
+./change_admin_password.sh mynewpassword123
+```
+
+**方法二：Django命令**
+```bash
+source venv/bin/activate
+python manage.py shell
+# 然后执行：
+from django.contrib.auth.models import User
+admin = User.objects.get(username='admin')
+admin.set_password('新密码')
+admin.save()
+```
+
+详细说明请参考：[ADMIN_PASSWORD_GUIDE.md](ADMIN_PASSWORD_GUIDE.md)
+
+测试账户（运行 `create_test_data.py` 后）：
 - 观察者: `viewer` / `viewer123`
 
-### 5. 停止服务
+### 6. 停止服务
 
 ```bash
 ./stop_dev.sh
