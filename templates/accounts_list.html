@@ -12,7 +12,6 @@
 <div class="desktop-nav">
     <a href="{% url 'dashboard' %}" class="active" id="nav-home">首页</a>
     <a href="{% url 'account_settings' %}" id="nav-settings">用户设置</a>
-    <a href="{% url 'accounts_manage' %}" id="nav-manage">管理账户</a>
     <div style="margin-left: auto; display: flex; gap: 5px;">
         <button class="lang-btn-nav" id="lang-zh" onclick="setLanguage('zh-hans')">中文</button>
         <button class="lang-btn-nav" id="lang-en" onclick="setLanguage('en')">EN</button>
@@ -255,7 +254,6 @@ function applyTranslations() {
     // Navigation
     updateElement('nav-home', lang === 'zh-hans' ? '首页' : 'Home');
     updateElement('nav-settings', lang === 'zh-hans' ? '用户设置' : 'Settings');
-    updateElement('nav-manage', lang === 'zh-hans' ? '管理账户' : 'Manage Accounts');
     
     // Mode switcher
     updateElement('mode-label', lang === 'zh-hans' ? '账户模式：' : 'Account Mode:');

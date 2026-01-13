@@ -18,12 +18,33 @@
         <button class="btn btn-primary" id="downloadNoteBtn" onclick="downloadNote()" style="display: none;">下载笔记</button>
     </div>
     <div class="card-body">
-        <!-- 交易选择 -->
-        <div id="trade-selector" style="margin-bottom: 20px;">
-            <label style="font-weight: 600; margin-bottom: 10px; display: block;">选择要分享的交易:</label>
-            <select id="tradeSelect" class="form-control" style="max-width: 400px;">
-                <option value="">加载中...</option>
-            </select>
+        <!-- 交易列表 -->
+        <div id="trade-list" style="margin-bottom: 20px;">
+            <label style="font-weight: 600; margin-bottom: 15px; display: block;">已完成的撮合交易 (<span id="trade-count">0</span>):</label>
+            <div style="font-size: 14px; color: #666; margin-bottom: 10px;">只显示开仓和平仓都已完成的完整交易对</div>
+            <div id="trade-items" style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9;">
+                <div style="padding: 20px; text-align: center; color: #666;">
+                    加载中...
+                </div>
+            </div>
+        </div>
+        
+        <!-- 交易详情模态框 -->
+        <div id="trade-modal" class="modal" style="display: none;">
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h3>交易详情</h3>
+                    <span class="close" onclick="closeTradeModal()">&times;</span>
+                </div>
+                <div class="modal-body" id="trade-details">
+                    <!-- 交易详情内容 -->
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" onclick="closeTradeModal()">关闭</button>
+                    <button class="btn btn-primary" onclick="generateTradeImageFromModal()">生成分享图</button>
+                    <button class="btn btn-secondary" onclick="generateTradeNoteFromModal()">导出笔记</button>
+                </div>
+            </div>
         </div>
         
         <!-- 预览区域 -->
@@ -321,6 +342,122 @@
 .btn-secondary:hover {
     background: linear-gradient(135deg, #e083eb 0%, #e5475c 100%);
 }
+
+/* 交易列表样式 */
+.trade-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #eee;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.trade-item:hover {
+    background-color: #f0f0f0;
+}
+
+.trade-item:last-child {
+    border-bottom: none;
+}
+
+.trade-item-info {
+    flex: 1;
+}
+
+.trade-symbol {
+    font-weight: bold;
+    font-size: 16px;
+    color: #333;
+}
+
+.trade-name {
+    font-size: 14px;
+    color: #666;
+    margin-top: 2px;
+}
+
+.trade-meta {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.trade-pnl {
+    text-align: right;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.pnl-profit {
+    color: #28a745;
+}
+
+.pnl-loss {
+    color: #dc3545;
+}
+
+/* 模态框样式 */
+.modal {
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 0;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    width: 90%;
+    max-width: 600px;
+}
+
+.modal-header {
+    padding: 20px;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #333;
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.modal-body {
+    padding: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.modal-footer {
+    padding: 20px;
+    border-top: 1px solid #ddd;
+    text-align: right;
+}
+
+.modal-footer .btn {
+    margin-left: 10px;
+}
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
@@ -349,7 +486,7 @@ async function loadTrades() {
         trades = trades.filter(t => t.status === 'FILLED');
         
         console.log('Loaded trades:', trades);
-        renderTradeSelector();
+        renderTradeList();
         
     } catch (error) {
         console.error('Failed to load trades:', error);
@@ -357,53 +494,271 @@ async function loadTrades() {
     }
 }
 
-// 渲染交易选择器
-function renderTradeSelector() {
-    const select = document.getElementById('tradeSelect');
+// 渲染交易列表
+function renderTradeList() {
+    const container = document.getElementById('trade-items');
+    const countElement = document.getElementById('trade-count');
     
-    if (trades.length === 0) {
-        select.innerHTML = '<option value="">暂无已完成的交易</option>';
+    // 找出所有完整的撮合交易（开仓+平仓）
+    const completedTrades = findCompletedTrades();
+    
+    countElement.textContent = completedTrades.length;
+    
+    if (completedTrades.length === 0) {
+        container.innerHTML = '<div style="padding: 20px; text-align: center; color: #666;">暂无已完成的撮合交易</div>';
         return;
     }
     
-    const options = trades.map(trade => {
-        const date = new Date(trade.traded_at).toLocaleDateString('zh-CN');
-        const action = getActionDisplay(trade.action);
-        const symbol = trade.security_info?.symbol || trade.security?.symbol || trade.security_symbol || 'N/A';
-        const name = trade.security_info?.name || trade.security?.name || trade.security_name || '';
+    const tradeItems = completedTrades.map(completedTrade => {
+        const { openTrade, closeTrade, pnl } = completedTrade;
+        const date = new Date(closeTrade.traded_at).toLocaleDateString('zh-CN');
+        const time = new Date(closeTrade.traded_at).toLocaleTimeString('zh-CN', {hour: '2-digit', minute: '2-digit'});
+        const symbol = closeTrade.security_info?.symbol || closeTrade.security?.symbol || closeTrade.security_symbol || 'N/A';
+        const name = closeTrade.security_info?.name || closeTrade.security?.name || closeTrade.security_name || '';
         
-        // 计算盈亏
-        let pnl = parseFloat(trade.realized_pnl || 0);
+        const pnlDisplay = pnl >= 0 ? `+${pnl.toFixed(2)}` : pnl.toFixed(2);
+        const pnlClass = pnl >= 0 ? 'pnl-profit' : 'pnl-loss';
         
-        // 如果是平仓且盈亏为0，自动计算
-        if ((trade.action === 'CLOSE_LONG' || trade.action === 'CLOSE_SHORT') && pnl === 0) {
+        // 计算持仓天数
+        const holdDays = Math.floor((new Date(closeTrade.traded_at) - new Date(openTrade.traded_at)) / (1000 * 60 * 60 * 24));
+        
+        return `
+            <div class="trade-item" onclick="showCompletedTradeDetails(${openTrade.id}, ${closeTrade.id})">
+                <div class="trade-item-info">
+                    <div class="trade-symbol">${symbol}</div>
+                    <div class="trade-name">${name}</div>
+                    <div class="trade-meta">${date} ${time} · 完成撮合 · 持仓${holdDays}天 · 数量: ${closeTrade.quantity}</div>
+                </div>
+                <div class="trade-pnl ${pnlClass}">${pnlDisplay} 港元</div>
+            </div>
+        `;
+    }).join('');
+    
+    container.innerHTML = tradeItems;
+}
+
+// 找出所有完整的撮合交易
+function findCompletedTrades() {
+    const completedTrades = [];
+    const processedTrades = new Set();
+    
+    // 遍历所有平仓交易
+    trades.forEach(trade => {
+        if (trade.action === 'CLOSE_LONG' || trade.action === 'CLOSE_SHORT') {
+            if (processedTrades.has(trade.id)) return;
+            
+            // 查找对应的开仓交易
             const openAction = trade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT';
             const openTrade = trades.find(t => 
                 t.security_info?.symbol === trade.security_info?.symbol &&
                 t.action === openAction &&
                 parseFloat(t.quantity) === parseFloat(trade.quantity) &&
-                new Date(t.traded_at) < new Date(trade.traded_at)
+                new Date(t.traded_at) < new Date(trade.traded_at) &&
+                !processedTrades.has(t.id)
             );
             
             if (openTrade) {
-                const openPrice = parseFloat(openTrade.price);
-                const closePrice = parseFloat(trade.price);
-                const quantity = parseFloat(trade.quantity);
-                
-                if (trade.action === 'CLOSE_LONG') {
-                    pnl = (closePrice - openPrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
-                } else {
-                    pnl = (openPrice - closePrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
+                // 计算盈亏
+                let pnl = parseFloat(trade.realized_pnl || 0);
+                if (pnl === 0) {
+                    const openPrice = parseFloat(openTrade.price);
+                    const closePrice = parseFloat(trade.price);
+                    const quantity = parseFloat(trade.quantity);
+                    
+                    if (trade.action === 'CLOSE_LONG') {
+                        pnl = (closePrice - openPrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
+                    } else {
+                        pnl = (openPrice - closePrice) * quantity - parseFloat(trade.fee || 0) - parseFloat(openTrade.fee || 0);
+                    }
                 }
+                
+                completedTrades.push({
+                    openTrade,
+                    closeTrade: trade,
+                    pnl
+                });
+                
+                processedTrades.add(openTrade.id);
+                processedTrades.add(trade.id);
             }
         }
-        
-        const pnlText = pnl !== 0 ? (pnl >= 0 ? `盈利+${pnl.toFixed(2)}` : `亏损${pnl.toFixed(2)}`) : '';
-        
-        return `<option value="${trade.id}">${date} - ${symbol} ${name} ${action} ${trade.quantity}股 @ ${trade.price} ${pnlText}</option>`;
-    }).join('');
+    });
     
-    select.innerHTML = '<option value="">请选择交易...</option>' + options;
+    // 按平仓时间排序
+    return completedTrades.sort((a, b) => new Date(b.closeTrade.traded_at) - new Date(a.closeTrade.traded_at));
+}
+
+// 显示撮合交易详情
+function showCompletedTradeDetails(openTradeId, closeTradeId) {
+    const openTrade = trades.find(t => t.id == openTradeId);
+    const closeTrade = trades.find(t => t.id == closeTradeId);
+    
+    if (!openTrade || !closeTrade) {
+        showError('未找到交易记录');
+        return;
+    }
+    
+    // 设置选中的交易为平仓交易（用于生成图片和笔记）
+    selectedTrade = closeTrade;
+    
+    // 计算盈亏
+    let pnl = parseFloat(closeTrade.realized_pnl || 0);
+    if (pnl === 0) {
+        const openPrice = parseFloat(openTrade.price);
+        const closePrice = parseFloat(closeTrade.price);
+        const quantity = parseFloat(closeTrade.quantity);
+        
+        if (closeTrade.action === 'CLOSE_LONG') {
+            pnl = (closePrice - openPrice) * quantity - parseFloat(closeTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+        } else {
+            pnl = (openPrice - closePrice) * quantity - parseFloat(closeTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+        }
+    }
+    
+    const isProfit = pnl >= 0;
+    const symbol = closeTrade.security_info?.symbol || '未知代码';
+    const name = closeTrade.security_info?.name || '股票名称';
+    const holdDays = Math.floor((new Date(closeTrade.traded_at) - new Date(openTrade.traded_at)) / (1000 * 60 * 60 * 24));
+    
+    // 构建详情HTML
+    const detailsHTML = `
+        <div style="line-height: 1.6;">
+            <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <h4 style="margin: 0 0 10px 0; color: #333;">撮合交易概览</h4>
+                <div style="margin-bottom: 8px;"><strong>股票代码：</strong>${symbol}</div>
+                <div style="margin-bottom: 8px;"><strong>股票名称：</strong>${name}</div>
+                <div style="margin-bottom: 8px;"><strong>持仓天数：</strong>${holdDays} 天</div>
+                <div style="padding: 10px; background: ${isProfit ? '#d4edda' : '#f8d7da'}; border-radius: 5px;">
+                    <strong style="color: ${isProfit ? '#155724' : '#721c24'};">总盈亏：</strong>
+                    <span style="color: ${isProfit ? '#155724' : '#721c24'}; font-weight: bold; font-size: 20px;">
+                        ${isProfit ? '+' : ''}${pnl.toFixed(2)} 港元
+                    </span>
+                </div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #333; border-bottom: 2px solid #007bff; padding-bottom: 5px;">📈 开仓信息</h4>
+                <div style="margin-bottom: 8px;"><strong>交易类型：</strong>${getActionDisplay(openTrade.action)}</div>
+                <div style="margin-bottom: 8px;"><strong>开仓价格：</strong>${parseFloat(openTrade.price).toFixed(3)} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>交易数量：</strong>${openTrade.quantity}</div>
+                <div style="margin-bottom: 8px;"><strong>交易金额：</strong>${(parseFloat(openTrade.price) * parseFloat(openTrade.quantity)).toFixed(2)} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>手续费：</strong>${openTrade.fee || 0} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>开仓时间：</strong>${new Date(openTrade.traded_at).toLocaleString('zh-CN')}</div>
+                <div style="margin-bottom: 8px;"><strong>开仓备注：</strong>${openTrade.notes || '无'}</div>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 15px 0; color: #333; border-bottom: 2px solid #dc3545; padding-bottom: 5px;">📉 平仓信息</h4>
+                <div style="margin-bottom: 8px;"><strong>交易类型：</strong>${getActionDisplay(closeTrade.action)}</div>
+                <div style="margin-bottom: 8px;"><strong>平仓价格：</strong>${parseFloat(closeTrade.price).toFixed(3)} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>交易数量：</strong>${closeTrade.quantity}</div>
+                <div style="margin-bottom: 8px;"><strong>交易金额：</strong>${(parseFloat(closeTrade.price) * parseFloat(closeTrade.quantity)).toFixed(2)} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>手续费：</strong>${closeTrade.fee || 0} 港元</div>
+                <div style="margin-bottom: 8px;"><strong>平仓时间：</strong>${new Date(closeTrade.traded_at).toLocaleString('zh-CN')}</div>
+                <div style="margin-bottom: 8px;"><strong>平仓备注：</strong>${closeTrade.notes || '无'}</div>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('trade-details').innerHTML = detailsHTML;
+    document.getElementById('trade-modal').style.display = 'block';
+}
+
+// 显示单笔交易详情（保留原函数以备使用）
+function showTradeDetails(tradeId) {
+    selectedTrade = trades.find(t => t.id == tradeId);
+    if (!selectedTrade) {
+        showError('未找到选中的交易');
+        return;
+    }
+    
+    // 计算盈亏
+    let pnl = parseFloat(selectedTrade.realized_pnl || 0);
+    const isClose = selectedTrade.action === 'CLOSE_LONG' || selectedTrade.action === 'CLOSE_SHORT';
+    
+    if (isClose && pnl === 0) {
+        const relatedTrade = trades.find(t => 
+            t.security_info?.symbol === selectedTrade.security_info?.symbol &&
+            t.action === (selectedTrade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT') &&
+            parseFloat(t.quantity) === parseFloat(selectedTrade.quantity) &&
+            new Date(t.traded_at) < new Date(selectedTrade.traded_at)
+        );
+        
+        if (relatedTrade) {
+            const openPrice = parseFloat(relatedTrade.price);
+            const closePrice = parseFloat(selectedTrade.price);
+            const quantity = parseFloat(selectedTrade.quantity);
+            
+            if (selectedTrade.action === 'CLOSE_LONG') {
+                pnl = (closePrice - openPrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(relatedTrade.fee || 0);
+            } else {
+                pnl = (openPrice - closePrice) * quantity - parseFloat(selectedTrade.fee || 0) - parseFloat(relatedTrade.fee || 0);
+            }
+        }
+    }
+    
+    const isProfit = pnl >= 0;
+    const symbol = selectedTrade.security_info?.symbol || '未知代码';
+    const name = selectedTrade.security_info?.name || '股票名称';
+    
+    // 构建详情HTML
+    const detailsHTML = `
+        <div style="line-height: 1.6;">
+            <div style="margin-bottom: 15px;">
+                <strong>股票代码：</strong>${symbol}
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>股票名称：</strong>${name}
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>交易类型：</strong>${getActionDisplay(selectedTrade.action)}
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>交易价格：</strong>${parseFloat(selectedTrade.price).toFixed(3)} 港元
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>交易数量：</strong>${selectedTrade.quantity}
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>交易金额：</strong>${(parseFloat(selectedTrade.price) * parseFloat(selectedTrade.quantity)).toFixed(2)} 港元
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>手续费：</strong>${selectedTrade.fee || 0} 港元
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>交易时间：</strong>${new Date(selectedTrade.traded_at).toLocaleString('zh-CN')}
+            </div>
+            <div style="margin-bottom: 15px;">
+                <strong>备注：</strong>${selectedTrade.notes || '无'}
+            </div>
+            <div style="margin-bottom: 15px; padding: 10px; background: ${isProfit ? '#d4edda' : '#f8d7da'}; border-radius: 5px;">
+                <strong style="color: ${isProfit ? '#155724' : '#721c24'};">盈亏金额：</strong>
+                <span style="color: ${isProfit ? '#155724' : '#721c24'}; font-weight: bold; font-size: 18px;">
+                    ${isProfit ? '+' : ''}${pnl.toFixed(2)} 港元
+                </span>
+            </div>
+        </div>
+    `;
+    
+    document.getElementById('trade-details').innerHTML = detailsHTML;
+    document.getElementById('trade-modal').style.display = 'block';
+}
+
+// 关闭模态框
+function closeTradeModal() {
+    document.getElementById('trade-modal').style.display = 'none';
+}
+
+// 从模态框生成图片
+function generateTradeImageFromModal() {
+    closeTradeModal();
+    generateTradeImage();
+}
+
+// 从模态框导出笔记
+function generateTradeNoteFromModal() {
+    closeTradeModal();
+    generateTradeNote();
 }
 
 // 获取操作显示文本
@@ -419,16 +774,8 @@ function getActionDisplay(action) {
 
 // 生成交易分享图
 async function generateTradeImage() {
-    const tradeId = document.getElementById('tradeSelect').value;
-    
-    if (!tradeId) {
-        showError('请先选择一个交易');
-        return;
-    }
-    
-    selectedTrade = trades.find(t => t.id == tradeId);
     if (!selectedTrade) {
-        showError('未找到选中的交易');
+        showError('请先选择一个交易');
         return;
     }
     
@@ -664,15 +1011,8 @@ function showSuccess(message) {
 
 // 生成交易笔记
 async function generateTradeNote() {
-    const tradeId = document.getElementById('tradeSelect').value;
-    if (!tradeId) {
-        showError('请先选择交易');
-        return;
-    }
-    
-    selectedTrade = trades.find(t => t.id == tradeId);
     if (!selectedTrade) {
-        showError('未找到选中的交易');
+        showError('请先选择交易');
         return;
     }
     
@@ -821,13 +1161,23 @@ async function generateTradeNote() {
     
     try {
         // 生成图片
-        const canvas = await html2canvas(noteCanvas.firstElementChild, {
+        const element = noteCanvas.firstElementChild;
+        console.log('Element scrollHeight:', element.scrollHeight);
+        console.log('Element scrollWidth:', element.scrollWidth);
+        console.log('Element offsetHeight:', element.offsetHeight);
+        console.log('Element offsetWidth:', element.offsetWidth);
+        
+        const canvas = await html2canvas(element, {
             scale: 2,
             useCORS: true,
             allowTaint: true,
             backgroundColor: null,
             width: 1080,
-            height: 2400
+            height: element.scrollHeight,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: element.scrollWidth,
+            windowHeight: element.scrollHeight
         });
         
         // 隐藏canvas

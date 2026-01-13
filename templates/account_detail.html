@@ -7,6 +7,7 @@
     <a href="{% url 'dashboard' %}"><span id="nav-home">首页</span></a>
     <a href="/accounts/"><span id="nav-account-list">账户列表</span></a>
     <a href="#" class="active"><span id="nav-account-detail">账户详情</span></a>
+    <a href="/accounts/{{ account_id }}/trades/share/"><span id="nav-trade-share">交易分享</span></a>
 </div>
 
 <!-- Account Header -->
@@ -124,12 +125,11 @@
 <!-- Trade Records -->
 <div class="card" id="tradesCard">
     <div class="card-header">
-        <h2 class="card-title">💹 交易记录</h2>
+        <h2 class="card-title">💹 撮合完成的交易</h2>
         <div style="display: flex; gap: 10px;">
             <button class="btn btn-sm" style="background: #28a745; color: white;" onclick="window.location.href='/accounts/{{ account_id }}/trades/share/'">
-                📸 导出图片
+                📸 交易分享
             </button>
-            <button id="viewAllTradesBtn" class="btn btn-secondary btn-sm" onclick="toggleAllTrades()">展开全部</button>
         </div>
     </div>
     <div class="card-body">
@@ -138,6 +138,9 @@
                 <div class="spinner"></div>
                 <div>加载中...</div>
             </div>
+        </div>
+        <div style="margin-top: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-size: 14px; color: #666;">
+            💡 点击任意撮合完成的交易可跳转到交易分享页面，生成分享图片或导出交易笔记
         </div>
     </div>
 </div>
@@ -842,24 +845,67 @@ async function handleClosePosition(event) {
     }
 }
 
+// 找出所有完整的撮合交易（开仓+平仓）
+function findCompletedTrades(trades) {
+    const completedTrades = [];
+    const processedTrades = new Set();
+    
+    // 遍历所有平仓交易
+    trades.forEach(trade => {
+        if (trade.action === 'CLOSE_LONG' || trade.action === 'CLOSE_SHORT') {
+            if (processedTrades.has(trade.id)) return;
+            
+            // 查找对应的开仓交易
+            const openAction = trade.action === 'CLOSE_LONG' ? 'OPEN_LONG' : 'OPEN_SHORT';
+            const openTrade = trades.find(t => 
+                t.security_info?.symbol === trade.security_info?.symbol &&
+                t.action === openAction &&
+                parseFloat(t.quantity) === parseFloat(trade.quantity) &&
+                new Date(t.traded_at) < new Date(trade.traded_at) &&
+                !processedTrades.has(t.id)
+            );
+            
+            if (openTrade) {
+                completedTrades.push({
+                    openTrade,
+                    closeTrade: trade
+                });
+                
+                processedTrades.add(openTrade.id);
+                processedTrades.add(trade.id);
+            }
+        }
+    });
+    
+    // 按平仓时间排序
+    return completedTrades.sort((a, b) => new Date(b.closeTrade.traded_at) - new Date(a.closeTrade.traded_at));
+}
+
 // Load trade records
 async function loadTradeRecords(limit = 10) {
     try {
         console.log('Loading trade records for account:', accountId);
-        const url = limit ? `/trades/?account=${accountId}&ordering=-traded_at&page_size=${limit}` : `/trades/?account=${accountId}&ordering=-traded_at`;
+        const url = `/trades/?account=${accountId}&ordering=-traded_at&page_size=100`; // 加载更多交易以便撮合
         const response = await API.get(url);
         console.log('Trades response:', response);
         const trades = response.results || response;
         console.log('Trades count:', trades.length);
         
-        if (trades.length === 0) {
+        // 找出撮合完成的交易
+        const completedTrades = findCompletedTrades(trades);
+        console.log('Completed trades count:', completedTrades.length);
+        
+        if (completedTrades.length === 0) {
             document.getElementById('tradeRecords').innerHTML = `
                 <div class="empty-state">
                     <div class="empty-icon">💹</div>
-                    <div>暂无交易记录</div>
+                    <div>暂无撮合完成的交易</div>
+                    <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                        需要开仓和平仓都完成才能显示
+                    </div>
                     <div style="margin-top: 10px;">
-                        <a href="/accounts/${accountId}/trades/new/" class="btn btn-primary">
-                            + 添加第一笔交易
+                        <a href="/accounts/${accountId}/trades/share/" class="btn btn-primary">
+                            📸 查看交易分享
                         </a>
                     </div>
                 </div>
@@ -867,7 +913,9 @@ async function loadTradeRecords(limit = 10) {
             return;
         }
         
-        const tradeHtml = trades.map(t => {
+        const tradeHtml = completedTrades.map(completedTrade => {
+            const { openTrade, closeTrade } = completedTrade;
+            const t = closeTrade; // 使用平仓交易作为主要显示
             console.log('Rendering trade:', t);
             const actionColors = {
                 'OPEN_LONG': '#28a745',
@@ -888,12 +936,33 @@ async function loadTradeRecords(limit = 10) {
             const securityName = t.security_info ? t.security_info.symbol : 'N/A';
             const securityColor = getSecurityColor(securityName);
             
+            // 计算持仓天数和盈亏
+            const holdDays = Math.floor((new Date(closeTrade.traded_at) - new Date(openTrade.traded_at)) / (1000 * 60 * 60 * 24));
+            let pnl = parseFloat(closeTrade.realized_pnl || 0);
+            if (pnl === 0) {
+                const openPrice = parseFloat(openTrade.price);
+                const closePrice = parseFloat(closeTrade.price);
+                const quantity = parseFloat(closeTrade.quantity);
+                
+                if (closeTrade.action === 'CLOSE_LONG') {
+                    pnl = (closePrice - openPrice) * quantity - parseFloat(closeTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+                } else {
+                    pnl = (openPrice - closePrice) * quantity - parseFloat(closeTrade.fee || 0) - parseFloat(openTrade.fee || 0);
+                }
+            }
+            
             return `
-                <div class="mobile-card" style="border-left: 4px solid ${securityColor};">
+                <div class="mobile-card" style="border-left: 4px solid ${securityColor}; cursor: pointer; transition: all 0.2s;" 
+                     onclick="window.location.href='/accounts/${accountId}/trades/share/'"
+                     onmouseover="this.style.transform='translateX(5px); this.style.boxShadow='0 4px 12px rgba(0,0,0,0.15)';"
+                     onmouseout="this.style.transform='translateX(0); this.style.boxShadow='none';">
                     <div class="mobile-card-primary">
                         <span style="font-weight: 600;">${securityName}</span>
                         <span class="badge" style="background-color: ${actionColor};">
-                            ${actionIcon} ${t.action_display}
+                            ${actionIcon} 撮合完成
+                        </span>
+                        <span class="badge" style="background-color: ${pnl >= 0 ? '#28a745' : '#dc3545'}; margin-left: 5px;">
+                            ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)}
                         </span>
                     </div>
                     <div class="mobile-card-row">
@@ -917,7 +986,11 @@ async function loadTradeRecords(limit = 10) {
                         </span>
                     </div>
                     <div class="mobile-card-row">
-                        <span class="mobile-card-label">交易时间</span>
+                        <span class="mobile-card-label">持仓天数</span>
+                        <span class="mobile-card-value" style="color: #666;">${holdDays} 天</span>
+                    </div>
+                    <div class="mobile-card-row">
+                        <span class="mobile-card-label">平仓时间</span>
                         <span class="mobile-card-value">${new Date(t.traded_at).toLocaleString('zh-CN')}</span>
                     </div>
                     ${t.notes ? `
@@ -1408,9 +1481,17 @@ function showError(message) {
     }, 3000);
 }
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
+// Initialize page
+document.addEventListener('DOMContentLoaded', async () => {
     applyTranslations();
+    
+    // Set trade share navigation text based on current language
+    const lang = localStorage.getItem('language') || 'zh-hans';
+    const tradeShareNav = document.getElementById('nav-trade-share');
+    if (tradeShareNav) {
+        tradeShareNav.textContent = lang === 'zh-hans' ? '交易分享' : 'Trade Share';
+    }
+    
     loadAccountDetails();
 });
 
@@ -1420,6 +1501,7 @@ function applyTranslations() {
         'nav-home': 'home',
         'nav-account-list': 'account_list',
         'nav-account-detail': 'account_detail',
+        'nav-trade-share': 'trade_share',
         'btn-back': 'back',
         'text-loading': 'loading',
         'btn-add-security': 'add_security',
