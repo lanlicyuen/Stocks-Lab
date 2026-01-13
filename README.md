@@ -102,12 +102,11 @@ cd frontend && npm run dev
 
 **方法一：使用脚本（推荐）**
 ```bash
-# 修改密码
-./change_admin_password.sh 新密码
-
-# 示例
-./change_admin_password.sh mynewpassword123
+# 交互式修改密码
+./change_admin_password.sh
 ```
+
+脚本会安全地提示输入新密码并进行确认验证。
 
 **方法二：Django命令**
 ```bash
