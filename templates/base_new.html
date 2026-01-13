@@ -868,9 +868,38 @@
                 'footer-disclaimer': 'footer_disclaimer'
             };
             
+            const lang = localStorage.getItem('language') || 'zh-hans';
+            
             for (const [id, key] of Object.entries(elements)) {
                 const el = document.getElementById(id);
-                if (el) el.textContent = t(key);
+                if (el) {
+                    try {
+                        // Try to use translation function
+                        if (typeof t === 'function') {
+                            el.textContent = t(key);
+                        } else {
+                            // Fallback to direct translation
+                            const fallbackTranslations = {
+                                'zh-hans': {
+                                    'site_title': '投资披露平台',
+                                    'account_settings': '账号管理',
+                                    'logout_menu': '登出',
+                                    'footer_disclaimer': 'Stocks-Lab 为个人开发的投资记录/模拟工具，不构成任何投资建议。'
+                                },
+                                'en': {
+                                    'site_title': 'Investment Disclosure Platform',
+                                    'account_settings': 'Account Settings',
+                                    'logout_menu': 'Logout',
+                                    'footer_disclaimer': 'Stocks-Lab is a personal investment recording/simulation tool and does not constitute any investment advice.'
+                                }
+                            };
+                            el.textContent = fallbackTranslations[lang][key] || el.textContent;
+                        }
+                    } catch (error) {
+                        console.warn('Translation error for', key, ':', error);
+                        // Keep original text if translation fails
+                    }
+                }
             }
         }
         
