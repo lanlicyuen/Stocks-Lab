@@ -100,15 +100,22 @@ cd frontend && npm run dev
 
 ### 5. 管理员密码修改
 
-**方法一：使用脚本（推荐）**
+**方法一：Web界面修改（推荐）**
+1. 登录系统后访问账号管理页面：http://localhost:20002/account
+2. 在"修改密码"区域填写：
+   - 当前密码
+   - 新密码（至少8位）
+   - 确认新密码
+3. 点击"修改密码"按钮
+4. 成功后会自动跳转到登录页，使用新密码重新登录
+
+**方法二：命令行脚本**
 ```bash
 # 交互式修改密码
 ./change_admin_password.sh
 ```
 
-脚本会安全地提示输入新密码并进行确认验证。
-
-**方法二：Django命令**
+**方法三：Django命令**
 ```bash
 source venv/bin/activate
 python manage.py shell
@@ -121,10 +128,26 @@ admin.save()
 
 详细说明请参考：[ADMIN_PASSWORD_GUIDE.md](ADMIN_PASSWORD_GUIDE.md)
 
-测试账户（运行 `create_test_data.py` 后）：
-- 观察者: `viewer` / `viewer123`
+### 6. 测试账户信息
 
-### 6. 停止服务
+**默认测试账户**：
+- **管理员账户**：
+  - 用户名: `admin`
+  - 密码: `admin123`
+  - 权限: 超级管理员，可访问所有功能
+
+- **观察者账户**（如需创建）：
+  - 用户名: `viewer`
+  - 密码: `viewer123`
+  - 权限: 只读权限，只能查看数据
+
+**登录地址**：
+- 前端界面: http://localhost:20003
+- 管理后台: http://localhost:20004/admin
+
+**注意**：建议首次登录后立即修改默认密码以保障安全。
+
+### 7. 停止服务
 
 ```bash
 ./stop_dev.sh
@@ -500,11 +523,51 @@ cd frontend && npm run dev
 - **Admin Panel**: http://localhost:20004/admin
 - **API Endpoints**: http://localhost:20004/api/v1
 
-Test accounts (after running `create_test_data.py`):
-- Admin: `admin` / `admin123`
-- Viewer: `viewer` / `viewer123`
+**Default Test Accounts**:
+- **Admin Account**:
+  - Username: `admin`
+  - Password: `admin123`
+  - Permissions: Superuser, full access to all features
 
-### 5. Stop Services
+- **Viewer Account** (if created):
+  - Username: `viewer`
+  - Password: `viewer123`
+  - Permissions: Read-only, can only view data
+
+**Login URLs**:
+- Frontend Interface: http://localhost:20003
+- Django Admin: http://localhost:20004/admin
+
+**Note**: It's recommended to change the default password after first login for security.
+
+### 5. Password Management
+
+**Method 1: Web Interface (Recommended)**
+1. Login and visit account management: http://localhost:20002/account
+2. Fill in the "Change Password" section:
+   - Current password
+   - New password (minimum 8 characters)
+   - Confirm new password
+3. Click "Change Password" button
+4. You'll be redirected to login page after success
+
+**Method 2: Command Line Script**
+```bash
+./change_admin_password.sh
+```
+
+**Method 3: Django Command**
+```bash
+source venv/bin/activate
+python manage.py shell
+# Then execute:
+from django.contrib.auth.models import User
+admin = User.objects.get(username='admin')
+admin.set_password('new_password')
+admin.save()
+```
+
+### 6. Stop Services
 
 ```bash
 ./stop_dev.sh
