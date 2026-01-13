@@ -75,6 +75,29 @@
         .role-admin { background: var(--danger-color); }
         .role-viewer { background: var(--primary-color); }
         
+        /* Language buttons */
+        .lang-btn-nav {
+            padding: 4px 8px;
+            border: 1px solid rgba(255,255,255,0.3);
+            background: transparent;
+            color: white;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .lang-btn-nav:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.5);
+        }
+        
+        .lang-btn-nav.active {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.6);
+            font-weight: 600;
+        }
+        
         /* User Dropdown */
         .user-dropdown {
             position: absolute;
@@ -115,6 +138,44 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 15px;
+        }
+        
+        /* Footer */
+        .main-footer {
+            margin-top: 40px;
+            padding: 20px 0;
+            border-top: 1px solid #eee;
+            background: #f8f9fa;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 15px;
+            text-align: center;
+        }
+        
+        .footer-disclaimer {
+            font-size: 12px;
+            color: #95a5a6;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        
+        .footer-copyright {
+            font-size: 12px;
+            color: #bdc3c7;
+        }
+        
+        .footer-link {
+            color: #667eea;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .footer-link:hover {
+            color: #764ba2;
+            text-decoration: underline;
         }
         
         /* Card */
@@ -545,15 +606,21 @@
     <div class="header">
         <div class="header-content">
             <h1>📊 <span id="site-title">投资披露平台</span></h1>
-            <div class="user-badge {% if user_role == 'ADMIN' %}role-admin{% else %}role-viewer{% endif %}" onclick="toggleUserDropdown()">
-                <span>{{ user.username }}</span>
-                {% if user_role %}
-                <span>({{ user_role }})</span>
-                {% endif %}
-                <span style="margin-left:4px;">▼</span>
-                <div class="user-dropdown" id="userDropdown">
-                    <a href="/account">⚙️ <span id="account-settings">账号管理</span></a>
-                    <a href="#" onclick="logout(event)">🚪 <span id="logout-menu">登出</span></a>
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <div style="display: flex; gap: 5px;">
+                    <button class="lang-btn-nav" id="lang-zh" onclick="setLanguage('zh-hans')">中文</button>
+                    <button class="lang-btn-nav" id="lang-en" onclick="setLanguage('en')">EN</button>
+                </div>
+                <div class="user-badge {% if user_role == 'ADMIN' %}role-admin{% else %}role-viewer{% endif %}" onclick="toggleUserDropdown()">
+                    <span>{{ user.username }}</span>
+                    {% if user_role %}
+                    <span>({{ user_role }})</span>
+                    {% endif %}
+                    <span style="margin-left:4px;">▼</span>
+                    <div class="user-dropdown" id="userDropdown">
+                        <a href="/account">⚙️ <span id="account-settings">账号管理</span></a>
+                        <a href="#" onclick="logout(event)">🚪 <span id="logout-menu">登出</span></a>
+                    </div>
                 </div>
             </div>
         </div>
@@ -826,7 +893,8 @@
             const elements = {
                 'site-title': 'site_title',
                 'account-settings': 'account_settings',
-                'logout-menu': 'logout_menu'
+                'logout-menu': 'logout_menu',
+                'footer-disclaimer': 'footer_disclaimer'
             };
             
             for (const [id, key] of Object.entries(elements)) {
@@ -835,10 +903,66 @@
             }
         }
         
+        // Language switching function
+        function setLanguage(lang) {
+            localStorage.setItem('language', lang);
+            
+            // Update button states
+            document.getElementById('lang-zh').classList.toggle('active', lang === 'zh-hans');
+            document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+            
+            // Apply translations
+            applyBaseTranslations();
+            applyFooterTranslations();
+            
+            // Trigger page-specific translation if available
+            if (typeof applyTranslations === 'function') {
+                applyTranslations();
+            }
+            
+            // Reload page to ensure all elements are translated
+            setTimeout(() => {
+                window.location.reload();
+            }, 100);
+        }
+        
+        // Apply footer translations
+        function applyFooterTranslations() {
+            const lang = localStorage.getItem('language') || 'zh-hans';
+            
+            // Update footer disclaimer
+            const disclaimerEl = document.getElementById('footer-disclaimer');
+            if (disclaimerEl) {
+                disclaimerEl.textContent = lang === 'zh-hans' ? 
+                    'Stocks-Lab 为个人开发的投资记录/模拟工具，不构成任何投资建议。' : 
+                    'Stocks-Lab is a personal investment recording/simulation tool and does not constitute any investment advice.';
+            }
+        }
+        
         // Apply translations when page loads
-        document.addEventListener('DOMContentLoaded', applyBaseTranslations);
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set initial language button state
+            const lang = localStorage.getItem('language') || 'zh-hans';
+            document.getElementById('lang-zh').classList.toggle('active', lang === 'zh-hans');
+            document.getElementById('lang-en').classList.toggle('active', lang === 'en');
+            
+            applyBaseTranslations();
+            applyFooterTranslations();
+        });
     </script>
     
-    {% block extra_script %}{% endblock %}
+    <!-- Footer -->
+<footer class="main-footer">
+    <div class="footer-content">
+        <div class="footer-disclaimer" id="footer-disclaimer">
+            Stocks-Lab 为个人开发的投资记录/模拟工具，不构成任何投资建议。
+        </div>
+        <div class="footer-copyright">
+            © 2025 1Plabs Dev · Support: <a href="http://support.1plabs.pro" class="footer-link" target="_blank" rel="noopener noreferrer">support.1plabs.pro</a>
+        </div>
+    </div>
+</footer>
+
+{% block extra_script %}{% endblock %}
 </body>
 </html>
